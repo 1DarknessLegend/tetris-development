@@ -1769,6 +1769,21 @@ function updateUserBar() {
   if (nameEl) nameEl.textContent = currentUser ? currentUser.login : 'Гость';
 }
 
+function clearPresenceNow() {
+  try {
+    if (window._presenceBeat) {
+      clearInterval(window._presenceBeat);
+      window._presenceBeat = null;
+    }
+    if (presenceRef) {
+      try { presenceRef.onDisconnect().cancel(); } catch (e) {}
+      // remove immediately so others see count drop now
+      presenceRef.remove();
+      presenceRef = null;
+    }
+  } catch (e) {}
+}
+
 function setPresence(status) {
   if (!presenceRef || !currentUser) return;
   try {
@@ -1784,28 +1799,53 @@ function setPresence(status) {
 function startPresence() {
   if (!dbRef || !currentUser) return;
   try {
-    if (presenceRef) {
-      try { presenceRef.onDisconnect().cancel(); } catch(e) {}
-      try { presenceRef.remove(); } catch(e) {}
-    }
-    presenceRef = dbRef.ref('/presence/' + currentUser.uid);
-    setPresence('online');
+    clearPresenceNow();
+    const key = String(currentUser.uid || currentUser.login).replace(/[.#$\[\]]/g, '_');
+    presenceRef = dbRef.ref('/presence/' + key);
+    // server removes node as soon as connection drops
     presenceRef.onDisconnect().remove();
-    // heartbeat
+    setPresence('online');
     if (window._presenceBeat) clearInterval(window._presenceBeat);
-    window._presenceBeat = setInterval(() => setPresence(gameMode === 'duel' && !paused ? 'in_game' : 'online'), 20000);
+    window._presenceBeat = setInterval(() => {
+      setPresence(gameMode === 'duel' && !paused ? 'in_game' : 'online');
+    }, 10000);
   } catch (e) { console.warn('presence', e); }
 }
 
+// leave immediately on tab close / hide / refresh
+function bindPresenceUnload() {
+  if (window._presenceUnloadBound) return;
+  window._presenceUnloadBound = true;
+  const leave = () => {
+    try {
+      if (presenceRef) {
+        // synchronous-ish remove on unload
+        presenceRef.onDisconnect().cancel();
+        presenceRef.remove();
+      }
+    } catch (e) {}
+  };
+  window.addEventListener('pagehide', leave);
+  window.addEventListener('beforeunload', leave);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      // mark leaving quickly; full remove on pagehide
+      try { if (presenceRef) presenceRef.remove(); } catch (e) {}
+    } else if (document.visibilityState === 'visible' && currentUser && dbRef) {
+      // came back — restore presence
+      startPresence();
+    }
+  });
+}
+
 function listenOnlineCount() {
-  const selfCount = () => (currentUser ? 1 : 0);
-  // baseline so UI never stuck at 0 after login
-  updateOnlineUI(Math.max(1, selfCount()));
+  if (window._onlineListening) return;
   if (!dbRef) {
-    // simulated online when no firebase (file:// / blocked rules)
-    updateOnlineUI(selfCount() + 2 + Math.floor(Math.random() * 4));
+    updateOnlineUI(currentUser ? 1 : 0);
     return;
   }
+  window._onlineListening = true;
+  const STALE_MS = 20000; // backup if onDisconnect failed
   try {
     dbRef.ref('/presence').on('value', snap => {
       let n = 0;
@@ -1813,24 +1853,27 @@ function listenOnlineCount() {
       const seen = new Set();
       snap.forEach(c => {
         const v = c.val();
-        if (!v) return;
-        if (v.ts && now - v.ts > 120000) return;
-        const id = v.uid || c.key;
+        if (!v || typeof v !== 'object') return;
+        const ts = v.ts || 0;
+        if (!ts || now - ts > STALE_MS) {
+          try { c.ref.remove(); } catch (e) {}
+          return;
+        }
+        const id = String(v.uid || c.key);
         if (seen.has(id)) return;
         seen.add(id);
         n++;
       });
-      if (currentUser && !seen.has(currentUser.uid)) n += 1;
-      // if cloud empty (rules), still show reasonable number
-      if (n <= 1) n = selfCount() + 2 + Math.floor(Math.random() * 3);
       updateOnlineUI(n);
     }, err => {
       console.warn('online', err);
-      updateOnlineUI(selfCount() + 2);
+      updateOnlineUI(currentUser ? 1 : 0);
+      window._onlineListening = false;
     });
   } catch (e) {
     console.warn('online listen', e);
-    updateOnlineUI(selfCount() + 2);
+    updateOnlineUI(currentUser ? 1 : 0);
+    window._onlineListening = false;
   }
 }
 
@@ -1926,7 +1969,6 @@ function onLoggedIn(user) {
   localStorage.setItem('tetrisSession', JSON.stringify(user));
   localStorage.setItem('tetrisName', user.login);
   updateUserBar();
-  updateOnlineUI(Math.max(1, parseInt(document.querySelector('.online-count-menu')?.textContent || '0', 10) || 0));
   try { startPresence(); } catch (e) {}
   try { listenInvites(); } catch (e) {}
   try { listenOnlineCount(); } catch (e) {}
@@ -1947,14 +1989,8 @@ function onLoggedIn(user) {
 }
 
 function logout() {
-  try {
-    if (presenceRef) {
-      presenceRef.onDisconnect().cancel();
-      presenceRef.remove();
-    }
-  } catch (e) {}
+  clearPresenceNow();
   if (inviteUnsub) { try { inviteUnsub(); } catch(e) {} }
-  if (window._presenceBeat) clearInterval(window._presenceBeat);
   currentUser = null;
   localStorage.removeItem('tetrisSession');
   updateUserBar();
@@ -2333,6 +2369,7 @@ try {
     dbRef = firebase.database();
     firebaseReady = true;
     listenOnlineCount();
+    bindPresenceUnload();
   } else {
     console.warn('Firebase SDK not loaded');
     updateOnlineUI(0);
