@@ -1,0 +1,10 @@
+{
+  "name": "Тетрис",
+  "short_name": "Тетрис",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#07070f",
+  "theme_color": "#07070f",
+  "lang": "ru",
+  "icons": []
+}

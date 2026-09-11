@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#07070f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Тетрис</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="mobile-web-app-capable" content="yes">
+</head>
+<body>
+
+
+<!-- AUTH -->
+<div id="auth-screen" class="screen active-screen">
+  <div class="auth-card">
+    <div class="logo big">TETRIS</div>
+    <p class="mode-sub" id="auth-subtitle">вход в аккаунт</p>
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" data-tab="login">Вход</button>
+      <button type="button" class="auth-tab" data-tab="register">Регистрация</button>
+    </div>
+    <form id="auth-form" autocomplete="on">
+      <input type="text" id="auth-login" placeholder="Логин" required minlength="3" maxlength="16" autocomplete="username" />
+      <input type="password" id="auth-pass" placeholder="Пароль" required minlength="4" maxlength="32" autocomplete="current-password" />
+      <input type="password" id="auth-pass2" placeholder="Повтор пароля" minlength="4" maxlength="32" style="display:none" autocomplete="new-password" />
+      <button type="submit" id="auth-submit" class="primary-btn">Войти</button>
+    </form>
+    <p id="auth-error" class="auth-error"></p>
+    <button type="button" id="auth-guest" class="ghost-btn">Играть как гость</button>
+  </div>
+</div>
+
+<!-- MODE SELECT -->
+<div id="mode-screen" class="screen">
+  <div class="user-bar" id="user-bar">
+    <span id="user-name-display">Гость</span>
+    <span class="online-badge menu-online">
+      <span class="online-dot"></span>
+      <span class="online-count-menu">0</span> онлайн
+    </span>
+    <button type="button" id="logout-btn" class="ghost-btn tiny">Выйти</button>
+  </div>
+  <div class="mode-hero">
+    <div class="logo big">TETRIS</div>
+    <p class="mode-sub">выбери режим</p>
+  </div>
+  <div class="mode-list">
+    <button class="mode-card" data-mode="classic">
+      <span class="mode-emoji">♾️</span>
+      <span class="mode-name">Марафон</span>
+      <span class="mode-desc">Классика · уровни растут</span>
+    </button>
+    <button class="mode-card" data-mode="sprint">
+      <span class="mode-emoji">⚡</span>
+      <span class="mode-name">Спринт 40L</span>
+      <span class="mode-desc">Очисти 40 линий на время</span>
+    </button>
+    <button class="mode-card" data-mode="zen">
+      <span class="mode-emoji">🧘</span>
+      <span class="mode-name">Дзен</span>
+      <span class="mode-desc">Без ускорения · спокойно</span>
+    </button>
+    <button class="mode-card" data-mode="hunger">
+      <span class="mode-emoji">🔥</span>
+      <span class="mode-name">Голод</span>
+      <span class="mode-desc">Мусорные линии снизу</span>
+    </button>
+    <button class="mode-card" data-mode="duel">
+      <span class="mode-emoji">⚔️</span>
+      <span class="mode-name">Дуэль</span>
+      <span class="mode-desc">Гонка до 3000 очков онлайн</span>
+    </button>
+  </div>
+  <div id="theme-of-day" class="tod-banner">
+    <span>🎁 Тема дня:</span> <b id="tod-name">—</b>
+    <button id="tod-apply" class="tod-btn">Вкл бесплатно</button>
+  </div>
+  <div class="mode-footer">
+    <button id="open-achievements" class="ghost-btn">🏆 Достижения</button>
+    <button id="open-quests" class="ghost-btn">📋 Квесты</button>
+    <button id="open-leaderboard" class="ghost-btn">🏅 Топ</button>
+    <button id="open-season" class="ghost-btn">🎟️ Сезон</button>
+    <button id="open-settings" class="ghost-btn">⚙️</button>
+  </div>
+  <div class="profile-bar">
+    <span>Профиль <b id="profile-level">1</b></span>
+    <div class="xp-bar"><div class="xp-fill" id="xp-fill" style="width:0%"></div></div>
+    <span id="profile-xp">0 XP</span>
+  </div>
+</div>
+
+<!-- LEADERBOARD -->
+<div id="leaderboard-screen" class="screen">
+  <button class="back-btn" id="lb-back">← Назад</button>
+  <h1 class="screen-title">Лидерборд</h1>
+  <div id="leaderboard-list" class="list-scroll"></div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settings-screen" class="screen">
+  <button class="back-btn" id="settings-back">← Назад</button>
+  <h1 class="screen-title">Настройки</h1>
+  <div class="settings-body">
+    <label class="set-row"><span>Звук</span><input type="checkbox" id="set-sound" checked></label>
+    <label class="set-row"><span>Вибрация</span><input type="checkbox" id="set-vibrate" checked></label>
+    <label class="set-row"><span>Призрачная фигура</span><input type="checkbox" id="set-ghost" checked></label>
+    <label class="set-row"><span>Скин блоков</span>
+      <select id="set-skin">
+        <option value="classic">Классика</option>
+        <option value="neon">Неон</option>
+        <option value="glass">Стекло</option>
+        <option value="pastel">Пастель</option>
+        <option value="mono">Моно</option>
+      </select>
+    </label>
+    <label class="set-row"><span>Задержка DAS</span>
+      <select id="set-das">
+        <option value="150">Быстро</option>
+        <option value="250" selected>Норма</option>
+        <option value="400">Медленно</option>
+      </select>
+    </label>
+    <label class="set-row"><span>Повтор ARR</span>
+      <select id="set-arr">
+        <option value="40">Быстро</option>
+        <option value="70" selected>Норма</option>
+        <option value="120">Медленно</option>
+      </select>
+    </label>
+  </div>
+</div>
+
+<!-- ACHIEVEMENTS -->
+<div id="achievements-screen" class="screen">
+  <button class="back-btn" id="ach-back">← Назад</button>
+  <h1 class="screen-title">Достижения</h1>
+  <div id="achievements-list" class="list-scroll"></div>
+</div>
+
+<!-- QUESTS -->
+<div id="quests-screen" class="screen">
+  <button class="back-btn" id="quests-back">← Назад</button>
+  <h1 class="screen-title">Ежедневные квесты</h1>
+  <p class="quests-date" id="quests-date"></p>
+  <div id="quests-list" class="list-scroll"></div>
+</div>
+
+
+<!-- SEASON PASS -->
+<div id="season-screen" class="screen">
+  <button class="back-btn" id="season-back">← Назад</button>
+  <h1 class="screen-title">Сезонный пропуск</h1>
+  <p class="quests-date">Награды за уровни профиля</p>
+  <div id="season-list" class="list-scroll"></div>
+</div>
+
+
+<!-- DUEL LOBBY -->
+<div id="duel-lobby-screen" class="screen">
+  <button class="back-btn" id="duel-lobby-back">← Назад</button>
+  <h1 class="screen-title">Дуэль 1vs1</h1>
+  <p class="quests-date">Онлайн: <span class="online-count-menu">0</span></p>
+  <div class="duel-search-wrap">
+    <input type="text" id="duel-search" placeholder="Поиск игрока по нику..." autocomplete="off" />
+    <button type="button" id="duel-refresh" class="ghost-btn">🔄</button>
+  </div>
+  <div id="duel-players-list" class="list-scroll"></div>
+  <div class="duel-lobby-actions">
+    <button type="button" id="duel-quick" class="primary-btn">⚡ Быстрый поиск</button>
+  </div>
+  <div id="duel-incoming" class="duel-incoming" style="display:none"></div>
+</div>
+
+<!-- MAIN GAME -->
+<div id="game" class="screen">
+  <header class="game-header">
+    <button id="menu-btn" class="icon-chip" title="Меню">☰</button>
+    <div class="logo">TETRIS</div>
+    <div class="online-badge" id="online-container">
+      <span class="online-dot"></span>
+      <span id="online-count" class="online-count-menu">0</span>
+    </div>
+  </header>
+
+  <div class="game-layout">
+    <aside class="side-panel">
+      <div class="stat-card">
+        <span class="stat-label">Счёт</span>
+        <span class="stat-value" id="score-val">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Рекорд</span>
+        <span class="stat-value dim" id="high-val">0</span>
+      </div>
+      <div class="stat-row">
+        <div class="stat-card mini">
+          <span class="stat-label">Ур.</span>
+          <span class="stat-value" id="level-val">1</span>
+        </div>
+        <div class="stat-card mini">
+          <span class="stat-label">Линии</span>
+          <span class="stat-value" id="lines-val">0</span>
+        </div>
+      </div>
+      <div class="stat-card mini" id="combo-card" style="display:none">
+        <span class="stat-label">Комбо</span>
+        <span class="stat-value" id="combo-val">0</span>
+      </div>
+      <div class="stat-card" id="timer-card" style="display:none">
+        <span class="stat-label">Время</span>
+        <span class="stat-value" id="timer-val">0:00</span>
+      </div>
+      <div class="stat-card" id="duel-card" style="display:none">
+        <span class="stat-label">Соперник</span>
+        <span class="stat-value" id="duel-opp">—</span>
+      </div>
+      <button id="pause-btn" class="pause-btn" title="Пауза (P)">⏸</button>
+    </aside>
+
+    <div class="board-wrap" id="board-wrap">
+      <canvas id="tetris" width="240" height="400"></canvas>
+      <div id="fx-layer"></div>
+    </div>
+
+    <aside class="side-panel right-side">
+      <div class="stat-card next-card">
+        <span class="stat-label">След.</span>
+        <canvas id="next-piece" width="72" height="72"></canvas>
+      </div>
+      <div class="stat-card hold-card">
+        <span class="stat-label">Hold (C)</span>
+        <canvas id="hold-piece" width="72" height="72"></canvas>
+      </div>
+    </aside>
+  </div>
+
+  <div class="controls">
+    <button id="hold-btn" class="ctrl-btn hold" aria-label="Hold">H</button>
+    <button id="left" class="ctrl-btn" aria-label="Влево">◀</button>
+    <button id="rotate" class="ctrl-btn" aria-label="Поворот">↻</button>
+    <button id="down" class="ctrl-btn" aria-label="Вниз">▼</button>
+    <button id="right" class="ctrl-btn" aria-label="Вправо">▶</button>
+    <button id="hard-drop" class="ctrl-btn hard" aria-label="Hard drop">⏬</button>
+  </div>
+
+  <nav class="bottom-nav">
+    <button id="shop" class="nav-btn">
+      <span class="nav-icon">🛒</span><span>Магазин</span>
+    </button>
+    <button id="case-btn" class="nav-btn gold">
+      <span class="nav-icon">🎁</span><span>Кейс</span>
+    </button>
+    <button id="easter-egg" class="nav-btn pink">
+      <span class="nav-icon">☠️</span><span>Пасхалка</span>
+    </button>
+  </nav>
+</div>
+
+<!-- GAME OVER OVERLAY -->
+<div id="gameover-screen" class="screen">
+  <div class="go-card">
+    <div class="go-title" id="go-title">GAME OVER</div>
+    <div class="go-stats">
+      <div><span>Счёт</span><b id="go-score">0</b></div>
+      <div><span>Линии</span><b id="go-lines">0</b></div>
+      <div><span>Уровень</span><b id="go-level">1</b></div>
+      <div id="go-time-row" style="display:none"><span>Время</span><b id="go-time">0:00</b></div>
+    </div>
+    <div class="go-actions">
+      <button id="go-retry" class="primary-btn">Ещё раз</button>
+      <button id="go-menu" class="ghost-btn">В меню</button>
+      <button id="go-share" class="ghost-btn">Поделиться</button>
+    </div>
+  </div>
+</div>
+
+<!-- CASE -->
+<div id="case-screen" class="screen">
+  <button id="return-case" class="back-btn">← Назад</button>
+  <div class="case-body">
+    <div class="case-hero">
+      <div class="case-glow"></div>
+      <div class="case-emoji">🎁</div>
+      <h1 class="case-title">Кейс</h1>
+      <p id="case-timer">Доступно через <span id="timer">00:00</span></p>
+    </div>
+    <div id="case-scroll-wrapper">
+      <div id="case-indicator"></div>
+      <div id="case-scroll"></div>
+    </div>
+    <button id="open-case" disabled>Открыть кейс</button>
+  </div>
+</div>
+
+<!-- EASTER -->
+<div id="easter-screen" class="screen">
+  <button id="return" class="back-btn">← Назад</button>
+  <div class="easter-body">
+    <div class="easter-text">Слинял отсюда быстро ☠️</div>
+    <button id="secret-btn" aria-label="Секрет"></button>
+  </div>
+</div>
+
+<!-- SHOP -->
+<div id="shop-screen" class="screen">
+  <button id="return-shop" class="back-btn">← Назад</button>
+  <div class="shop-top">
+    <h1>Магазин</h1>
+    <div id="balance" class="balance-pill">💎 <span id="balance-num">0</span></div>
+  </div>
+  <div class="search-wrap">
+    <input type="text" id="search" placeholder="Поиск темы..." autocomplete="off" />
+  </div>
+  <div id="shop-items">
+
+
+      
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#1 Тема Мелстрой — 200 очков</span>
+          <button id="buy-theme">Купить</button>
+        </div>
+        <div class="actions" id="theme-actions">
+          <button id="apply-theme">Вкл тему Мелстрой</button>
+          <button id="remove-theme">Выкл тему Мелстрой</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#2 Тема Бурундук — 200 очков</span>
+          <button id="buy-chipmunk">Купить</button>
+        </div>
+        <div class="actions" id="chipmunk-actions">
+          <button id="apply-chipmunk">Вкл тему Бурундук</button>
+          <button id="remove-chipmunk">Выкл тему Бурундук</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#3 Тема Глент — 200 очков</span>
+          <button id="buy-glent">Купить</button>
+        </div>
+        <div class="actions" id="glent-actions">
+          <button id="apply-glent">Вкл тему Глент</button>
+          <button id="remove-glent">Выкл тему Глент</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#4 Тема Билли — 200 очков</span>
+          <button id="buy-billy">Купить</button>
+        </div>
+        <div class="actions" id="billy-actions">
+          <button id="apply-billy">Вкл тему Билли</button>
+          <button id="remove-billy">Выкл тему Билли</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#5 Тема Пидорс — 200 очков</span>
+          <button id="buy-pidors">Купить</button>
+        </div>
+        <div class="actions" id="pidors-actions">
+          <button id="apply-pidors">Вкл тему Пидорс</button>
+          <button id="remove-pidors">Выкл тему Пидорс</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#6 Тема Босинн — 200 очков</span>
+          <button id="buy-bosinn">Купить</button>
+        </div>
+        <div class="actions" id="bosinn-actions">
+          <button id="apply-bosinn">Вкл тему Босинн</button>
+          <button id="remove-bosinn">Выкл тему Босинн</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#7 Тема Билли v2 — 200 очков</span>
+          <button id="buy-billyv2">Купить</button>
+        </div>
+        <div class="actions" id="billyv2-actions">
+          <button id="apply-billyv2">Вкл тему Билли v2</button>
+          <button id="remove-billyv2">Выкл тему Билли v2</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#8 Тема Едит — 200 очков</span>
+          <button id="buy-edit">Купить</button>
+        </div>
+        <div class="actions" id="edit-actions">
+          <button id="apply-edit">Вкл тему Едит</button>
+          <button id="remove-edit">Выкл тему Едит</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#9 Тема Гига Чад — 200 очков</span>
+          <button id="buy-gigachad">Купить</button>
+        </div>
+        <div class="actions" id="gigachad-actions">
+          <button id="apply-gigachad">Вкл тему Гига Чад</button>
+          <button id="remove-gigachad">Выкл тему Гига Чад</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#10 Тема Мага — 200 очков</span>
+          <button id="buy-maga">Купить</button>
+        </div>
+        <div class="actions" id="maga-actions">
+          <button id="apply-maga">Вкл тему Мага</button>
+          <button id="remove-maga">Выкл тему Мага</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#11 Тема Подкрадули — 200 очков</span>
+          <button id="buy-sneakedup">Купить</button>
+        </div>
+        <div class="actions" id="sneakedup-actions">
+          <button id="apply-sneakedup">Вкл тему Подкрадули</button>
+          <button id="remove-sneakedup">Выкл тему Подкрадули</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#12 Тема Гоблин Генг — 200 очков</span>
+          <button id="buy-goblingang">Купить</button>
+        </div>
+        <div class="actions" id="goblingang-actions">
+          <button id="apply-goblingang">Вкл тему Гоблин Генг</button>
+          <button id="remove-goblingang">Выкл тему Гоблин Генг</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#13 Тема Секси Бэтмен — 200 очков</span>
+          <button id="buy-sexibetmen">Купить</button>
+        </div>
+        <div class="actions" id="sexibetmen-actions">
+          <button id="apply-sexibetmen">Вкл тему Секси Бэтмен</button>
+          <button id="remove-sexibetmen">Выкл тему Секси Бэтмен</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#14 Тема Сигма — 200 очков</span>
+          <button id="buy-sigma">Купить</button>
+        </div>
+        <div class="actions" id="sigma-actions">
+          <button id="apply-sigma">Вкл тему Сигма</button>
+          <button id="remove-sigma">Выкл тему Сигма</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#15 Тема Рикардо Миллос — 200 очков</span>
+          <button id="buy-ricardomillos">Купить</button>
+        </div>
+        <div class="actions" id="ricardomillos-actions">
+          <button id="apply-ricardomillos">Вкл тему Рикардо Миллос</button>
+          <button id="remove-ricardomillos">Выкл тему Рикардо Миллос</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#16 Тема Троллфейс — 200 очков</span>
+          <button id="buy-trollface">Купить</button>
+        </div>
+        <div class="actions" id="trollface-actions">
+          <button id="apply-trollface">Вкл тему Троллфейс</button>
+          <button id="remove-trollface">Выкл тему Троллфейс</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#17 Тема Кобякок — 200 очков</span>
+          <button id="buy-kobyakov">Купить</button>
+        </div>
+        <div class="actions" id="kobyakov-actions">
+          <button id="apply-kobyakov">Вкл тему Кобякок</button>
+          <button id="remove-kobyakov">Выкл тему Кобякок</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#18 Тема Чипи-Чапа — 200 очков</span>
+          <button id="buy-chipichapa">Купить</button>
+        </div>
+        <div class="actions" id="chipichapa-actions">
+          <button id="apply-chipichapa">Вкл тему Чипи-Чапа</button>
+          <button id="remove-chipichapa">Выкл тему Чипи-Чапа</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#19 Тема Ватсапп — 200 очков</span>
+          <button id="buy-whatsapp">Купить</button>
+        </div>
+        <div class="actions" id="whatsapp-actions">
+          <button id="apply-whatsapp">Вкл тему Ватсапп</button>
+          <button id="remove-whatsapp">Выкл тему Ватсапп</button>
+        </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#20 Тема Рикролл — 200 очков</span>
+          <button id="buy-rickroll">Купить</button>
+        </div>
+        <div class="actions" id="rickroll-actions">
+          <button id="apply-rickroll">Вкл тему Рикролл</button>
+          <button id="remove-rickroll">Выкл тему Рикролл</button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#21 Тема Билли v3  — 200 очков</span>
+          <button id="buy-billyv3">Купить</button>
+        </div>
+        <div class="actions" id="billyv3-actions">
+          <button id="apply-billyv3">Вкл тему Билли v3</button>
+          <button id="remove-billyv3">Выкл тему Билли v3</button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#22 Тема Репо — 200 очков</span>
+          <button id="buy-repo">Купить</button>
+        </div>
+        <div class="actions" id="repo-actions">
+          <button id="apply-repo">Вкл тему </button>
+          <button id="remove-repo">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#23 Тема Танец — 200 очков</span>
+          <button id="buy-dance">Купить</button>
+        </div>
+        <div class="actions" id="dance-actions">
+          <button id="apply-dance">Вкл тему </button>
+          <button id="remove-dance">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#24 Тема Данте — 200 очков</span>
+          <button id="buy-dante">Купить</button>
+        </div>
+        <div class="actions" id="dante-actions">
+          <button id="apply-dante">Вкл тему </button>
+          <button id="remove-dante">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#25 Тема Джош — 200 очков</span>
+          <button id="buy-josh">Купить</button>
+        </div>
+        <div class="actions" id="josh-actions">
+          <button id="apply-josh">Вкл тему </button>
+          <button id="remove-josh">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#26 Тема Репо v2 — 200 очков</span>
+          <button id="buy-repov2">Купить</button>
+        </div>
+        <div class="actions" id="repov2-actions">
+          <button id="apply-repov2">Вкл тему </button>
+          <button id="remove-repov2">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#27 Тема Творожок — 200 очков</span>
+          <button id="buy-tvorog">Купить</button>
+        </div>
+        <div class="actions" id="tvorog-actions">
+          <button id="apply-tvorog">Вкл тему </button>
+          <button id="remove-tvorog">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#28 Тема Курица — 200 очков</span>
+          <button id="buy-chicken">Купить</button>
+        </div>
+        <div class="actions" id="chicken-actions">
+          <button id="apply-chicken">Вкл тему </button>
+          <button id="remove-chicken">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#29 Тема Билли v4 — 200 очков</span>
+          <button id="buy-billyv4">Купить</button>
+        </div>
+        <div class="actions" id="billyv4-actions">
+          <button id="apply-billyv4">Вкл тему </button>
+          <button id="remove-billyv4">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#30 Тема Музыка — 200 очков</span>
+          <button id="buy-music">Купить</button>
+        </div>
+        <div class="actions" id="music-actions">
+          <button id="apply-music">Вкл тему </button>
+          <button id="remove-music">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#31 Тема Крокодил — 200 очков</span>
+          <button id="buy-crocodile">Купить</button>
+        </div>
+        <div class="actions" id="crocodile-actions">
+          <button id="apply-crocodile">Вкл тему </button>
+          <button id="remove-crocodile">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#32 Тема Данте v2 — 200 очков</span>
+          <button id="buy-dantev2">Купить</button>
+        </div>
+        <div class="actions" id="dantev2-actions">
+          <button id="apply-dantev2">Вкл тему </button>
+          <button id="remove-dantev2">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#33 Тема Петух — 200 очков</span>
+          <button id="buy-rooster">Купить</button>
+        </div>
+        <div class="actions" id="rooster-actions">
+          <button id="apply-rooster">Вкл тему </button>
+          <button id="remove-rooster">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#34 Тема Гусь — 200 очков</span>
+          <button id="buy-goose">Купить</button>
+        </div>
+        <div class="actions" id="goose-actions">
+          <button id="apply-goose">Вкл тему </button>
+          <button id="remove-goose">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#35 Тема Музыка v2 — 200 очков</span>
+          <button id="buy-musicv2">Купить</button>
+        </div>
+        <div class="actions" id="musicv2-actions">
+          <button id="apply-musicv2">Вкл тему </button>
+          <button id="remove-musicv2">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#36 Тема Роман про — 200 очков</span>
+          <button id="buy-romapro">Купить</button>
+        </div>
+        <div class="actions" id="romapro-actions">
+          <button id="apply-romapro">Вкл тему </button>
+          <button id="remove-romapro">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#37 Тема Крипер — 200 очков</span>
+          <button id="buy-creeper">Купить</button>
+        </div>
+        <div class="actions" id="creeper-actions">
+          <button id="apply-creeper">Вкл тему </button>
+          <button id="remove-creeper">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#38 Тема Петух v2 — 200 очков</span>
+          <button id="buy-roosterv2">Купить</button>
+        </div>
+        <div class="actions" id="roosterv2-actions">
+          <button id="apply-roosterv2">Вкл тему </button>
+          <button id="remove-roosterv2">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#39 Тема Скибиди — 200 очков</span>
+          <button id="buy-toilet">Купить</button>
+        </div>
+        <div class="actions" id="toilet-actions">
+          <button id="apply-toilet">Вкл тему </button>
+          <button id="remove-toilet">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#40 Тема Мыша — 200 очков</span>
+          <button id="buy-ratdance">Купить</button>
+        </div>
+        <div class="actions" id="ratdance-actions">
+          <button id="apply-ratdance">Вкл тему </button>
+          <button id="remove-ratdance">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#41 Тема Кингвон — 200 очков</span>
+          <button id="buy-kingvon">Купить</button>
+        </div>
+        <div class="actions" id="kingvon-actions">
+          <button id="apply-kingvon">Вкл тему </button>
+          <button id="remove-kingvon">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#42 Тема Музыка v3 — 200 очков</span>
+          <button id="buy-musicv3">Купить</button>
+        </div>
+        <div class="actions" id="musicv3-actions">
+          <button id="apply-musicv3">Вкл тему </button>
+          <button id="remove-musicv3">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#43 Тема Брето — 200 очков</span>
+          <button id="buy-breto">Купить</button>
+        </div>
+        <div class="actions" id="breto-actions">
+          <button id="apply-breto">Вкл тему </button>
+          <button id="remove-breto">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#44 Тема Петух v3 — 200 очков</span>
+          <button id="buy-roosterv3">Купить</button>
+        </div>
+        <div class="actions" id="roosterv3-actions">
+          <button id="apply-roosterv3">Вкл тему </button>
+          <button id="remove-roosterv3">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#45 Тема Мактрахер — 200 очков</span>
+          <button id="buy-mactraher">Купить</button>
+        </div>
+        <div class="actions" id="mactraher-actions">
+          <button id="apply-mactraher">Вкл тему </button>
+          <button id="remove-mactraher">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#46 Тема День ног — 200 очков</span>
+          <button id="buy-legday">Купить</button>
+        </div>
+        <div class="actions" id="legday-actions">
+          <button id="apply-legday">Вкл тему </button>
+          <button id="remove-legday">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#47 Тема Лазеры — 200 очков</span>
+          <button id="buy-laser">Купить</button>
+        </div>
+        <div class="actions" id="laser-actions">
+          <button id="apply-laser">Вкл тему </button>
+          <button id="remove-laser">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#48 Тема Дракон — 200 очков</span>
+          <button id="buy-dragon">Купить</button>
+        </div>
+        <div class="actions" id="dragon-actions">
+          <button id="apply-dragon">Вкл тему </button>
+          <button id="remove-dragon">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#49 Тема Троллфейс v2 — 200 очков</span>
+          <button id="buy-trollfacev2">Купить</button>
+        </div>
+        <div class="actions" id="trollfacev2-actions">
+          <button id="apply-trollfacev2">Вкл тему </button>
+          <button id="remove-trollfacev2">Выкл тему </button>
+          </div>
+      </div>
+      <div class="shop-item">
+        <div class="shop-row">
+          <span>#50 Тема Эндоскелет — 200 очков</span>
+          <button id="buy-endoskeleton">Купить</button>
+        </div>
+        <div class="actions" id="endoskeleton-actions">
+          <button id="apply-endoskeleton">Вкл тему </button>
+          <button id="remove-endoskeleton">Выкл тему </button>
+        </div>
+      </div>
+  </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+
+<!-- === Аудиофайлы и видеоконтент тем === -->
+<audio id="mell-music" src="mellstroy.mp3" loop preload="auto"></audio>
+  <video id="chipmunk-video" src="https://1darknesslegend.github.io/chipmunk/chipmunk.mp4" loop preload="auto" style="display:none"></video>
+  <video id="edit-video" src="https://1darknesslegend.github.io/edit/edit.mp4" loop preload="auto" style="display:none"></video>
+  <video id="glent-video" src="https://1darknesslegend.github.io/glent/glent.mp4" loop preload="auto" style="display:none"></video>
+  <video id="billy-video" src="https://1darknesslegend.github.io/billy/billy.mp4" loop preload="auto" style="display:none"></video>
+  <video id="pidors-video" src="pidors.mp4" loop preload="auto" style="display:none"></video>
+  <video id="bosinn-video" src="https://1darknesslegend.github.io/bosinn/bosinn.mp4" loop preload="auto" style="display:none"></video>
+  <video id="billyv2-video" src="https://1darknesslegend.github.io/billyv2/billyv2.mp4" loop preload="auto" style="display:none"></video>
+  <video id="gigachad-video" src="https://1darknesslegend.github.io/gigachad/gigachad.mp4" loop preload="auto" style="display:none"></video>
+  <video id="maga-video" src="https://1darknesslegend.github.io/maga/maga.mp4" loop preload="auto" style="display:none"></video>
+  <video id="sneakedup-video" src="https://1darknesslegend.github.io/sneakedup/sneakedup.mp4" loop preload="auto" style="display:none"></video>
+  <video id="goblingang-video" src="https://1darknesslegend.github.io/goblingang/goblingang.mp4" loop preload="auto" style="display:none"></video>
+  <video id="sexibetmen-video" src="https://1darknesslegend.github.io/sexibetmen/sexibetmen.mp4" loop preload="auto" style="display:none"></video>
+  <video id="sigma-video" src="https://1darknesslegend.github.io/sigma/sigma.mp4" loop preload="auto" style="display:none"></video>
+  <video id="ricardomillos-video" src="https://1darknesslegend.github.io/ricardomillos/ricardomillos.mp4" loop preload="auto" style="display:none"></video>
+  <video id="trollface-video" src="https://1darknesslegend.github.io/trollface/trollface.mp4" loop preload="auto" style="display:none"></video>
+  <video id="kobyakov-video" src="https://1darknesslegend.github.io/kobyakov/kobyakov.mp4" loop preload="auto" style="display:none"></video>
+  <video id="chipichapa-video" src="https://1darknesslegend.github.io/chipichapa/chipichapa.mp4" loop preload="auto" style="display:none"></video>
+  <video id="whatsapp-video" src="https://1darknesslegend.github.io/whatsapp/whatsapp.mp4" loop preload="auto" style="display:none"></video>
+  <video id="rickroll-video" src="https://1darknesslegend.github.io/rickroll/rickroll.mp4" loop preload="auto" style="display:none"></video>
+  <video id="billyv3-video" src="https://1darknesslegend.github.io/billyv3/billyv3.mp4" loop preload="auto" style="display:none"></video>
+  <video id="repo-video" src="https://1darknesslegend.github.io/repo/repo.mp4" loop preload="auto" style="display:none"></video>
+  <video id="repo-video" src="https://1darknesslegend.github.io/repo/repo.mp4" loop preload="auto" style="display:none"></video>
+  <video id="dance-video" src="https://1darknesslegend.github.io/dance/dance.mp4" loop preload="auto" style="display:none"></video>
+  <video id="dante-video" src="https://1darknesslegend.github.io/dante/dante.mp4" loop preload="auto" style="display:none"></video>
+  <video id="josh-video" src="https://1darknesslegend.github.io/josh/josh.mp4" loop preload="auto" style="display:none"></video>
+  <video id="repov2-video" src="https://1darknesslegend.github.io/repov2/repov2.mp4" loop preload="auto" style="display:none"></video>
+  <video id="tvorog-video" src="https://1darknesslegend.github.io/tvorog/tvorog.mp4" loop preload="auto" style="display:none"></video>
+  <video id="chicken-video" src="https://1darknesslegend.github.io/chicken/chicken.mp4" loop preload="auto" style="display:none"></video>
+  <video id="billyv4-video" src="https://1darknesslegend.github.io/billyv4/billyv4.mp4" loop preload="auto" style="display:none"></video>
+  <video id="music-video" src="https://1darknesslegend.github.io/music/music.mp4" loop preload="auto" style="display:none"></video>
+  <video id="crocodile-video" src="https://1darknesslegend.github.io/crocodile/crocodile.mp4" loop preload="auto" style="display:none"></video>
+  <video id="dantev2-video" src="https://1darknesslegend.github.io/dantev2/dantev2.mp4" loop preload="auto" style="display:none"></video>
+  <video id="rooster-video" src="https://1darknesslegend.github.io/rooster/rooster.mp4" loop preload="auto" style="display:none"></video>
+  <video id="goose-video" src="https://1darknesslegend.github.io/goose/goose.mp4" loop preload="auto" style="display:none"></video>
+  <video id="musicv2-video" src="https://1darknesslegend.github.io/musicv2/musicv2.mp4" loop preload="auto" style="display:none"></video>
+  <video id="romapro-video" src="https://1darknesslegend.github.io/romapro/romapro.mp4" loop preload="auto" style="display:none"></video>
+  <video id="creeper-video" src="https://1darknesslegend.github.io/creeper/creeper.mp4" loop preload="auto" style="display:none"></video>
+  <video id="roosterv2-video" src="https://1darknesslegend.github.io/roosterv2/roosterv2.mp4" loop preload="auto" style="display:none"></video>
+  <video id="toilet-video" src="https://1darknesslegend.github.io/toilet/toilet.mp4" loop preload="auto" style="display:none"></video>
+  <video id="ratdance-video" src="https://1darknesslegend.github.io/ratdance/ratdance.mp4" loop preload="auto" style="display:none"></video>
+  <video id="kingvon-video" src="https://1darknesslegend.github.io/kingvon/kingvon.mp4" loop preload="auto" style="display:none"></video>
+  <video id="musicv3-video" src="https://1darknesslegend.github.io/musicv3/musicv3.mp4" loop preload="auto" style="display:none"></video>
+  <video id="breto-video" src="https://1darknesslegend.github.io/breto/breto.mp4" loop preload="auto" style="display:none"></video>
+  <video id="roosterv3-video" src="https://1darknesslegend.github.io/roosterv3/roosterv3.mp4" loop preload="auto" style="display:none"></video>
+  <video id="mactraher-video" src="https://1darknesslegend.github.io/mactraher/mactraher.mp4" loop preload="auto" style="display:none"></video>
+  <video id="legday-video" src="https://1darknesslegend.github.io/legday/legday.mp4" loop preload="auto" style="display:none"></video>
+   <video id="laser-video" src="https://1darknesslegend.github.io/laser/laser.mp4" loop preload="auto" style="display:none"></video>
+   <video id="dragon-video" src="https://1darknesslegend.github.io/dragon/dragon.mp4" loop preload="auto" style="display:none"></video>
+   <video id="trollfacev2-video" src="https://1darknesslegend.github.io/trollfacev2/trollfacev2.mp4" loop preload="auto" style="display:none"></video>
+   <video id="endoskeleton-video" src="https://1darknesslegend.github.io/endoskeleton/endoskeleton.mp4" loop preload="auto" style="display:none"></video>
+  
+<!-- === Отображение количества игроков онлайн === -->
+<!-- === Основной скрипт игры === -->
+<script src="script.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
+
