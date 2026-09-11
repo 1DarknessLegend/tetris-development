@@ -169,14 +169,15 @@ const QUEST_POOL = [
   { id: 'q_score5k', name: 'Набери 5000 очков', target: 5000, key: 'score', reward: 700 },
   { id: 'q_tetris', name: 'Сделай 1 тетрис', target: 1, key: 'tetris', reward: 500 },
   { id: 'q_combo', name: 'Комбо x3', target: 3, key: 'combo', reward: 450 },
-  { id: 'q_play3', name: 'Сыграй 3 партии', target: 3, key: 'games', reward: 350 },
+  { id: 'q_hold', name: 'Используй удержание 5 раз', target: 5, key: 'hold', reward: 350 },
 ];
 
 let quests = JSON.parse(localStorage.getItem('tetrisQuests') || 'null');
-if (!quests || quests.date !== todayKey() || !quests.items || quests.items.length !== 10) {
+if (!quests || quests.date !== todayKey() || !quests.items || quests.items.length !== 10 || quests.ver !== 2) {
   const shuffled = QUEST_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 10);
   quests = {
     date: todayKey(),
+    ver: 2,
     items: shuffled.map(q => ({ ...q, progress: 0, claimed: false }))
   };
   localStorage.setItem('tetrisQuests', JSON.stringify(quests));
@@ -199,8 +200,7 @@ function questProgress(key, amount) {
 
 function renderQuests() {
   const list = document.getElementById('quests-list');
-  const dateEl = document.getElementById('quests-date');
-  if (dateEl) dateEl.textContent = 'Сегодня · ' + quests.date;
+  // date hidden
   if (!list) return;
   list.innerHTML = quests.items.map((q, i) => {
     const ready = q.progress >= q.target;
@@ -652,11 +652,14 @@ function bindSettings() {
     });
   });
   document.getElementById('set-reset-stats')?.addEventListener('click', () => {
-    if (!confirm('Сбросить локальную статистику, достижения и квесты?')) return;
-    localStorage.removeItem('tetrisStats');
-    localStorage.removeItem('tetrisQuests');
-    localStorage.removeItem('tetrisSeason');
-    localStorage.removeItem('tetrisLocalScores');
+    if (!confirm('Сбросить статистику, рекорды, очки, темы, достижения и квесты?')) return;
+    const keys = [
+      'tetrisStats', 'tetrisQuests', 'tetrisSeason', 'tetrisLocalScores',
+      'tetrisLocalLevels', 'tetrisHighScore', 'tetrisBalance', 'tetrisBought',
+      'tetrisCaseAt', 'tetrisUsers', 'tetrisSession', 'tetrisName',
+      'tetrisSettings', 'tetrisDuelId'
+    ];
+    keys.forEach(k => localStorage.removeItem(k));
     location.reload();
   });
   colors = SKINS[settings.skin] || SKINS.classic;
@@ -1362,6 +1365,7 @@ function addGarbage(n) {
 }
 
 function playerHold() {
+  try { questProgress('hold', 1); } catch(e) {}
   if (paused || gameOver || holdLocked) return;
   const current = player.matrix;
   if (holdMatrix) {
@@ -1755,11 +1759,7 @@ function sanitizeLogin(login) {
 }
 
 function updateOnlineUI(n) {
-  document.querySelectorAll('.online-count-menu').forEach(el => {
-    el.textContent = String(n);
-  });
-  const el = document.getElementById('online-count');
-  if (el) el.textContent = String(n);
+  /* online UI removed from game */
 }
 
 function updateUserBar() {
@@ -1976,9 +1976,12 @@ function bindAuthUI() {
       if (err) err.textContent = '';
     });
   });
+  function clearAuthError() {
+    if (err) { err.textContent = ''; err.hidden = true; }
+  }
   async function doAuth(e) {
     if (e) e.preventDefault();
-    if (err) err.textContent = '';
+    clearAuthError();
     const login = (document.getElementById('auth-login')?.value || '').trim();
     const pass = document.getElementById('auth-pass')?.value || '';
     const p2 = document.getElementById('auth-pass2')?.value || '';
@@ -1990,10 +1993,11 @@ function bindAuthUI() {
       } else {
         user = await loginUser(login, pass);
       }
+      clearAuthError();
       onLoggedIn(user);
     } catch (ex) {
       console.error(ex);
-      if (err) err.textContent = ex.message || 'Ошибка';
+      clearAuthError();
       toast(ex.message || 'Ошибка входа');
     }
   }
@@ -2009,10 +2013,12 @@ function bindAuthUI() {
   });
   document.getElementById('auth-guest')?.addEventListener('click', (e) => {
     e.preventDefault();
+    clearAuthError();
     onLoggedIn(loginAsGuest());
   });
   document.getElementById('auth-guest')?.addEventListener('touchend', (e) => {
     e.preventDefault();
+    clearAuthError();
     onLoggedIn(loginAsGuest());
   }, { passive: false });
   document.getElementById('logout-btn')?.addEventListener('click', logout);
@@ -2020,25 +2026,12 @@ function bindAuthUI() {
 
 // ===================== DUEL LOBBY =====================
 function openDuelLobby() {
-  if (!currentUser) {
-    toast('Сначала войди в аккаунт');
-    showScreen(document.getElementById('auth-screen'));
-    return;
-  }
   const sc = document.getElementById('duel-lobby-screen');
   showScreen(sc);
   if (sc) {
     sc.style.display = 'flex';
     sc.classList.add('active-screen');
   }
-  try { setPresence('searching'); } catch(e) {}
-  // always show bots first for instant feedback on mobile
-  try {
-    const q = (document.getElementById('duel-search')?.value || '').trim().toLowerCase();
-    const bots = botPlayers().filter(p => !q || p.login.toLowerCase().includes(q));
-    renderPlayersList(bots);
-  } catch (e) { console.warn(e); }
-  refreshPlayerList();
 }
 
 function botPlayers() {

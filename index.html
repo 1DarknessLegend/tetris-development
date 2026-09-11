@@ -26,10 +26,10 @@
       <input type="text" id="auth-login" name="username" placeholder="Логин" required minlength="3" maxlength="16" autocomplete="username" enterkeyhint="next" />
       <input type="password" id="auth-pass" name="password" placeholder="Пароль" required minlength="4" maxlength="32" autocomplete="current-password" enterkeyhint="done" />
       <input type="password" id="auth-pass2" name="password2" placeholder="Повтор пароля" minlength="4" maxlength="32" style="display:none" autocomplete="new-password" />
+      <p id="auth-error" class="auth-error" hidden></p>
       <button type="submit" id="auth-submit" class="primary-btn">Войти</button>
       <button type="button" id="auth-guest" class="ghost-btn auth-guest-btn">Играть как гость</button>
     </form>
-    <p id="auth-error" class="auth-error"></p>
   </div>
 </div>
 
@@ -37,10 +37,6 @@
 <div id="mode-screen" class="screen">
   <div class="user-bar" id="user-bar">
     <span id="user-name-display">Гость</span>
-    <span class="online-badge menu-online">
-      <span class="online-dot"></span>
-      <span class="online-count-menu">0</span> онлайн
-    </span>
     <button type="button" id="logout-btn" class="ghost-btn tiny">Выйти</button>
   </div>
   <div class="mode-hero">
@@ -58,7 +54,7 @@
     <button class="mode-card" data-mode="classic">
       <span class="mode-emoji">♾️</span>
       <span class="mode-name">Марафон</span>
-      <span class="mode-desc">Классика · уровни растут</span>
+      <span class="mode-desc">Классический режим игры</span>
     </button>
     <button class="mode-card" data-mode="sprint">
       <span class="mode-emoji">⚡</span>
@@ -74,8 +70,7 @@
   <div class="mode-footer">
     <button id="open-achievements" class="ghost-btn menu-action-btn">🏆 Достижения</button>
     <button id="open-quests" class="ghost-btn menu-action-btn">📋 Квесты</button>
-    <button id="open-leaderboard" class="ghost-btn menu-action-btn">🏅 Топ</button>
-    <button id="open-settings" class="ghost-btn menu-action-btn settings-footer-btn">⚙️ Настройки</button>
+    <button id="open-settings" class="ghost-btn menu-action-btn">⚙️ Настройки</button>
   </div>
 </div>
 
@@ -137,7 +132,7 @@
 <div id="quests-screen" class="screen">
   <button class="back-btn" id="quests-back">← Назад</button>
   <h1 class="screen-title">Ежедневные квесты</h1>
-  <p class="quests-date" id="quests-date"></p>
+  <!-- quests date removed -->
   <div id="quests-list" class="list-scroll"></div>
 </div>
 
@@ -151,20 +146,14 @@
 </div>
 
 
-<!-- DUEL LOBBY -->
+<!-- DUEL LOBBY (in development) -->
 <div id="duel-lobby-screen" class="screen">
-  <button class="back-btn" id="duel-lobby-back">← Назад</button>
-  <h1 class="screen-title">Дуэль 1vs1</h1>
-  <p class="quests-date">Онлайн: <span class="online-count-menu">0</span></p>
-  <div class="duel-search-wrap">
-    <input type="text" id="duel-search" placeholder="Поиск игрока по нику..." autocomplete="off" />
-    <button type="button" id="duel-refresh" class="ghost-btn">🔄</button>
+  <div class="dev-card">
+    <div class="dev-emoji">⚔️</div>
+    <h1 class="screen-title">Дуэль</h1>
+    <p class="dev-text">В разработке</p>
+    <button type="button" id="duel-lobby-back" class="primary-btn">← Назад</button>
   </div>
-  <div id="duel-players-list" class="list-scroll"></div>
-  <div class="duel-lobby-actions">
-    <button type="button" id="duel-quick" class="primary-btn">⚡ Быстрый поиск</button>
-  </div>
-  <div id="duel-incoming" class="duel-incoming" style="display:none"></div>
 </div>
 
 <!-- MAIN GAME -->
@@ -172,10 +161,7 @@
   <header class="game-header">
     <button id="menu-btn" class="icon-chip" title="Меню">☰</button>
     <div class="logo">TETRIS</div>
-    <div class="online-badge" id="online-container">
-      <span class="online-dot"></span>
-      <span id="online-count" class="online-count-menu">0</span>
-    </div>
+    <div class="header-spacer"></div>
   </header>
 
   <div class="game-layout">
