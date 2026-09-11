@@ -1343,3 +1343,46 @@ button:focus { outline: none; }
 body > .profile-bar:not(.center-profile) {
   display: none !important;
 }
+
+.auth-card {
+  box-sizing: border-box;
+  padding: 28px !important;
+  margin: 16px;
+  width: min(340px, calc(100% - 32px)) !important;
+  max-width: 340px;
+}
+
+.profile-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.profile-line .xp-bar {
+  flex: 1;
+  height: 8px;
+  min-width: 80px;
+}
+.profile-line b {
+  color: var(--purple-bright);
+  font-size: 14px;
+}
+#profile-xp {
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.mode-footer .menu-action-btn,
+.mode-footer .ghost-btn.menu-action-btn {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+.mode-footer .menu-action-btn:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}

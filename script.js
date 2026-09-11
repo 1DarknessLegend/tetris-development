@@ -82,34 +82,21 @@ const ACHIEVEMENTS = [
   { id: 'lines_40', name: 'Спринтер', desc: 'Очисти 40 линий', check: s => s.totalLines >= 40 },
   { id: 'lines_100', name: 'Сотня', desc: 'Очисти 100 линий', check: s => s.totalLines >= 100 },
   { id: 'lines_200', name: 'Марафонец', desc: 'Очисти 200 линий', check: s => s.totalLines >= 200 },
-  { id: 'lines_500', name: 'Ветеран', desc: 'Очисти 500 линий', check: s => s.totalLines >= 500 },
   { id: 'score_1k', name: '1K', desc: 'Набери 1000 очков за игру', check: s => s.bestScore >= 1000 },
   { id: 'score_5k', name: '5K', desc: 'Набери 5000 очков за игру', check: s => s.bestScore >= 5000 },
   { id: 'score_20k', name: '20K', desc: 'Набери 20000 очков за игру', check: s => s.bestScore >= 20000 },
-  { id: 'score_50k', name: '50K', desc: 'Набери 50000 очков за игру', check: s => s.bestScore >= 50000 },
   { id: 'tetris', name: 'Тетрис!', desc: 'Очисти 4 линии сразу', check: s => s.tetrises >= 1 },
   { id: 'tetris5', name: 'Тетрис x5', desc: 'Сделай 5 тетрисов', check: s => s.tetrises >= 5 },
   { id: 'combo3', name: 'Комбо x3', desc: 'Сделай комбо x3', check: s => s.maxCombo >= 3 },
   { id: 'combo5', name: 'Комбо x5', desc: 'Сделай комбо x5', check: s => s.maxCombo >= 5 },
-  { id: 'combo8', name: 'Комбо x8', desc: 'Сделай комбо x8', check: s => s.maxCombo >= 8 },
   { id: 'level5', name: 'Уровень 5', desc: 'Достигни 5 уровня в игре', check: s => s.maxLevel >= 5 },
   { id: 'level10', name: 'Уровень 10', desc: 'Достигни 10 уровня в игре', check: s => s.maxLevel >= 10 },
-  { id: 'level15', name: 'Уровень 15', desc: 'Достигни 15 уровня в игре', check: s => s.maxLevel >= 15 },
   { id: 'sprint_finish', name: 'Спринт пройден', desc: 'Пройди спринт 100L', check: s => s.sprints >= 1 },
-  { id: 'sprint3', name: 'Спринт x3', desc: 'Пройди спринт 3 раза', check: s => s.sprints >= 3 },
   { id: 'buyer', name: 'Шопоголик', desc: 'Купи 3 темы', check: s => s.themesBought >= 3 },
-  { id: 'collector', name: 'Коллекционер', desc: 'Купи 10 тем', check: s => s.themesBought >= 10 },
   { id: 'case_open', name: 'Удача', desc: 'Открой кейс', check: s => s.casesOpened >= 1 },
-  { id: 'case5', name: 'Кладоискатель', desc: 'Открой 5 кейсов', check: s => s.casesOpened >= 5 },
   { id: 'tspin', name: 'T-Spin', desc: 'Сделай T-Spin', check: s => (s.tspins || 0) >= 1 },
-  { id: 'tspin5', name: 'T-Spin мастер', desc: 'Сделай 5 T-Spin', check: s => (s.tspins || 0) >= 5 },
-  { id: 'profile_3', name: 'Профиль 3', desc: 'Профиль 3 уровня', check: s => profileLevel() >= 3 },
   { id: 'profile_5', name: 'Профиль 5', desc: 'Профиль 5 уровня', check: s => profileLevel() >= 5 },
-  { id: 'profile_10', name: 'Профиль 10', desc: 'Профиль 10 уровня', check: s => profileLevel() >= 10 },
   { id: 'duel_win', name: 'Дуэлянт', desc: 'Выиграй дуэль', check: s => (s.duelWins || 0) >= 1 },
-  { id: 'duel3', name: 'Гладиатор', desc: 'Выиграй 3 дуэли', check: s => (s.duelWins || 0) >= 3 },
-  { id: 'games10', name: 'Игрок', desc: 'Сыграй 10 партий', check: s => (s.gamesPlayed || 0) >= 10 },
-  { id: 'games50', name: 'Завсегдатай', desc: 'Сыграй 50 партий', check: s => (s.gamesPlayed || 0) >= 50 },
 ];
 
 let stats = JSON.parse(localStorage.getItem('tetrisStats') || '{}');
@@ -132,7 +119,7 @@ function updateProfileUI() {
   const level = profileLevel();
   const cur = profileXP();
   if (lv) lv.textContent = level;
-  if (xp) xp.textContent = cur + '/25';
+  if (xp) xp.textContent = cur + '/25 XP';
   if (fill) fill.style.width = (cur / 25 * 100) + '%';
 }
 
@@ -181,18 +168,13 @@ const QUEST_POOL = [
   { id: 'q_score2k', name: 'Набери 2000 очков', target: 2000, key: 'score', reward: 400 },
   { id: 'q_score5k', name: 'Набери 5000 очков', target: 5000, key: 'score', reward: 700 },
   { id: 'q_tetris', name: 'Сделай 1 тетрис', target: 1, key: 'tetris', reward: 500 },
-  { id: 'q_tetris3', name: 'Сделай 3 тетриса', target: 3, key: 'tetris', reward: 900 },
   { id: 'q_combo', name: 'Комбо x3', target: 3, key: 'combo', reward: 450 },
-  { id: 'q_combo5', name: 'Комбо x5', target: 5, key: 'combo', reward: 700 },
-  { id: 'q_play', name: 'Сыграй 2 партии', target: 2, key: 'games', reward: 200 },
   { id: 'q_play3', name: 'Сыграй 3 партии', target: 3, key: 'games', reward: 350 },
-  { id: 'q_play5', name: 'Сыграй 5 партий', target: 5, key: 'games', reward: 500 },
 ];
 
 let quests = JSON.parse(localStorage.getItem('tetrisQuests') || 'null');
-if (!quests || quests.date !== todayKey()) {
-  // pick 3 random
-  const shuffled = QUEST_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 4);
+if (!quests || quests.date !== todayKey() || !quests.items || quests.items.length !== 10) {
+  const shuffled = QUEST_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 10);
   quests = {
     date: todayKey(),
     items: shuffled.map(q => ({ ...q, progress: 0, claimed: false }))
@@ -399,7 +381,7 @@ function updateScore() {
   }
   if (gameMode === 'duel') {
     publishDuelScore();
-    if (score >= (settings.duelTarget || 3000) && !gameOver) {
+    if (score >= (settings.duelTarget || 5000) && !gameOver) {
       endGame(true);
       toast('⚔️ Победа в дуэли!');
     }
@@ -646,16 +628,12 @@ document.getElementById('season-back')?.addEventListener('click', () => showScre
 function bindSettings() {
   const map = [
     ['set-sound', 'sound', 'checked'],
-    ['set-music', 'music', 'checked'],
-    ['set-vibrate', 'vibrate', 'checked'],
     ['set-ghost', 'ghost', 'checked'],
     ['set-grid', 'grid', 'checked'],
     ['set-particles', 'particles', 'checked'],
-    ['set-shake', 'shake', 'checked'],
     ['set-skin', 'skin', 'value'],
     ['set-das', 'das', 'value'],
     ['set-arr', 'arr', 'value'],
-    ['set-duel-target', 'duelTarget', 'value'],
   ];
   map.forEach(([id, key, prop]) => {
     const el = document.getElementById(id);
@@ -673,20 +651,6 @@ function bindSettings() {
       saveSettings();
     });
   });
-  const nick = document.getElementById('set-nickname');
-  if (nick) {
-    nick.value = settings.nickname || (currentUser && currentUser.login) || '';
-    nick.addEventListener('change', () => {
-      settings.nickname = nick.value.trim().slice(0, 16);
-      saveSettings();
-      if (settings.nickname) {
-        localStorage.setItem('tetrisName', settings.nickname);
-        if (currentUser && !currentUser.guest) {
-          // keep account login, only display name for boards
-        }
-      }
-    });
-  }
   document.getElementById('set-reset-stats')?.addEventListener('click', () => {
     if (!confirm('Сбросить локальную статистику, достижения и квесты?')) return;
     localStorage.removeItem('tetrisStats');
@@ -1494,7 +1458,7 @@ function startDuelMatchmaking() {
         // timeout 20s -> solo practice vs ghost target
         setTimeout(() => {
           if (gameMode === 'duel' && duelOppScore === 0) {
-            toast('Играем против цели 3000');
+            toast('Играем против цели 5000');
           }
         }, 20000);
       }
@@ -1521,7 +1485,7 @@ function listenDuel() {
     const el = document.getElementById('duel-opp');
     if (el) el.textContent = duelOppScore;
     // win/lose check
-    if (duelOppScore >= (settings.duelTarget || 3000) && score < (settings.duelTarget || 3000) && !gameOver) {
+    if (duelOppScore >= (settings.duelTarget || 5000) && score < (settings.duelTarget || 5000) && !gameOver) {
       endGame(false);
       toast('Поражение в дуэли');
     }
@@ -2153,7 +2117,7 @@ function startBotDuel(botName) {
   toast('⚔️ Дуэль с ' + (botName || 'ботом'));
   // bot scores gradually
   if (window._botTimer) clearInterval(window._botTimer);
-  const target = settings.duelTarget || 3000;
+  const target = settings.duelTarget || 5000;
   window._botTimer = setInterval(() => {
     if (gameOver || gameMode !== 'duel' || paused) return;
     duelOppScore += 40 + Math.floor(Math.random() * 80);
@@ -2197,7 +2161,7 @@ function acceptInvite(fromUid, fromName) {
     hostScore: 0,
     guestScore: 0,
     status: 'active',
-    target: 3000,
+    target: 5000,
     ts: Date.now()
   };
   dbRef.ref('/duelRooms/' + roomId).set(room).then(() => {
@@ -2227,7 +2191,7 @@ function startDuelWithRoom(roomId, room) {
     duelOppScore = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
     const el = document.getElementById('duel-opp');
     if (el) el.textContent = String(duelOppScore);
-    if (duelOppScore >= (settings.duelTarget || 3000) && score < (settings.duelTarget || 3000) && !gameOver) {
+    if (duelOppScore >= (settings.duelTarget || 5000) && score < (settings.duelTarget || 5000) && !gameOver) {
       endGame(false);
       toast('Поражение в дуэли');
     }
@@ -2299,7 +2263,7 @@ function quickMatch() {
           host: v.host, hostName: v.hostName || 'Игрок',
           guest: currentUser.uid, guestName: currentUser.login,
           hostScore: 0, guestScore: 0, status: 'active',
-          target: settings.duelTarget || 3000, ts: Date.now()
+          target: settings.duelTarget || 5000, ts: Date.now()
         };
         dbRef.ref('/duelRooms/' + roomId).set(room);
         startDuelWithRoom(roomId, room);
@@ -2323,7 +2287,7 @@ function quickMatch() {
             host: currentUser.uid, hostName: currentUser.login,
             guest: v.guest, guestName: v.guestName || 'Игрок',
             hostScore: 0, guestScore: 0, status: 'active',
-            target: settings.duelTarget || 3000, ts: Date.now()
+            target: settings.duelTarget || 5000, ts: Date.now()
           };
           dbRef.ref('/duelRooms/' + ref.key).set(room);
           startDuelWithRoom(ref.key, room);

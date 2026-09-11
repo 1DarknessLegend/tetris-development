@@ -47,9 +47,11 @@
     <div class="logo big">TETRIS</div>
     <p class="mode-sub">выбери режим</p>
     <div class="profile-bar center-profile" id="menu-profile">
-      <span>Уровень <b id="profile-level">1</b></span>
-      <div class="xp-bar"><div class="xp-fill" id="xp-fill" style="width:0%"></div></div>
-      <span id="profile-xp">0/25</span>
+      <div class="profile-line">
+        <span>Уровень <b id="profile-level">1</b></span>
+        <div class="xp-bar"><div class="xp-fill" id="xp-fill" style="width:0%"></div></div>
+        <span id="profile-xp">0/25 XP</span>
+      </div>
     </div>
   </div>
   <div class="mode-list">
@@ -66,16 +68,14 @@
     <button class="mode-card" data-mode="duel">
       <span class="mode-emoji">⚔️</span>
       <span class="mode-name">Дуэль</span>
-      <span class="mode-desc">Гонка до 3000 очков онлайн</span>
+      <span class="mode-desc">Гонка до 5000 очков</span>
     </button>
   </div>
   <div class="mode-footer">
-    <button id="open-achievements" class="ghost-btn">🏆 Достижения</button>
-    <button id="open-quests" class="ghost-btn">📋 Квесты</button>
-    <button id="open-leaderboard" class="ghost-btn">🏅 Топ</button>
-    <button id="open-settings" class="ghost-btn settings-footer-btn">⚙️ Настройки</button>
-  </div></div>
-    <span id="profile-xp">0 XP</span>
+    <button id="open-achievements" class="ghost-btn menu-action-btn">🏆 Достижения</button>
+    <button id="open-quests" class="ghost-btn menu-action-btn">📋 Квесты</button>
+    <button id="open-leaderboard" class="ghost-btn menu-action-btn">🏅 Топ</button>
+    <button id="open-settings" class="ghost-btn menu-action-btn settings-footer-btn">⚙️ Настройки</button>
   </div>
 </div>
 
@@ -96,12 +96,9 @@
   <h1 class="screen-title">Настройки</h1>
   <div class="settings-body">
     <label class="set-row"><span>Звук</span><input type="checkbox" id="set-sound" checked></label>
-    <label class="set-row"><span>Музыка тем</span><input type="checkbox" id="set-music" checked></label>
-    <label class="set-row"><span>Вибрация</span><input type="checkbox" id="set-vibrate" checked></label>
     <label class="set-row"><span>Призрачная фигура</span><input type="checkbox" id="set-ghost" checked></label>
     <label class="set-row"><span>Сетка поля</span><input type="checkbox" id="set-grid" checked></label>
     <label class="set-row"><span>Частицы</span><input type="checkbox" id="set-particles" checked></label>
-    <label class="set-row"><span>Тряска экрана</span><input type="checkbox" id="set-shake" checked></label>
     <label class="set-row"><span>Скин блоков</span>
       <select id="set-skin">
         <option value="classic">Классика</option>
@@ -124,16 +121,6 @@
         <option value="70" selected>Норма</option>
         <option value="120">Медленно</option>
       </select>
-    </label>
-    <label class="set-row"><span>Цель дуэли</span>
-      <select id="set-duel-target">
-        <option value="1500">1500</option>
-        <option value="3000" selected>3000</option>
-        <option value="5000">5000</option>
-      </select>
-    </label>
-    <label class="set-row"><span>Ник в игре</span>
-      <input type="text" id="set-nickname" maxlength="16" placeholder="Ник" style="width:120px;padding:6px 8px;border-radius:8px;border:1px solid rgba(139,92,246,0.3);background:#0a0a14;color:#fff" />
     </label>
     <button type="button" id="set-reset-stats" class="ghost-btn" style="width:100%;margin-top:8px">Сбросить локальную статистику</button>
   </div>
