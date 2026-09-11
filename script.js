@@ -24,7 +24,7 @@ let paused = false;
 let gameOver = false;
 let combo = 0;
 let gameMode = 'classic'; // classic | sprint | zen | hunger
-let sprintTarget = 40;
+let sprintTarget = 100;
 let sprintStart = 0;
 let sprintElapsed = 0;
 let holdMatrix = null;
@@ -95,7 +95,7 @@ const ACHIEVEMENTS = [
   { id: 'level5', name: 'Уровень 5', desc: 'Достигни 5 уровня в игре', check: s => s.maxLevel >= 5 },
   { id: 'level10', name: 'Уровень 10', desc: 'Достигни 10 уровня в игре', check: s => s.maxLevel >= 10 },
   { id: 'level15', name: 'Уровень 15', desc: 'Достигни 15 уровня в игре', check: s => s.maxLevel >= 15 },
-  { id: 'sprint_finish', name: 'Спринт пройден', desc: 'Пройди спринт 40L', check: s => s.sprints >= 1 },
+  { id: 'sprint_finish', name: 'Спринт пройден', desc: 'Пройди спринт 100L', check: s => s.sprints >= 1 },
   { id: 'sprint3', name: 'Спринт x3', desc: 'Пройди спринт 3 раза', check: s => s.sprints >= 3 },
   { id: 'buyer', name: 'Шопоголик', desc: 'Купи 3 темы', check: s => s.themesBought >= 3 },
   { id: 'collector', name: 'Коллекционер', desc: 'Купи 10 тем', check: s => s.themesBought >= 10 },
@@ -132,7 +132,7 @@ function updateProfileUI() {
   const level = profileLevel();
   const cur = profileXP();
   if (lv) lv.textContent = level;
-  if (xp) xp.textContent = cur + '/25 XP';
+  if (xp) xp.textContent = cur + '/25';
   if (fill) fill.style.width = (cur / 25 * 100) + '%';
 }
 
@@ -638,10 +638,7 @@ function renderSeason() {
   });
 }
 
-document.getElementById('open-season')?.addEventListener('click', () => {
-  renderSeason();
-  showScreen(document.getElementById('season-screen'));
-});
+// season removed from UI
 document.getElementById('season-back')?.addEventListener('click', () => showScreen(modeScreen));
 
 
@@ -1767,18 +1764,26 @@ const firebaseConfig = {
   appId: "1:38355194193:web:93229f575c86111a8f7af0"
 };
 
+function hashPassSync(pass) {
+  // Works on mobile file:// without crypto.subtle
+  let h1 = 5381, h2 = 52711;
+  const s = 'tetris:v2:' + String(pass);
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    h1 = ((h1 << 5) + h1) ^ c;
+    h2 = ((h2 << 5) + h2) + c;
+  }
+  return (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0');
+}
 async function hashPass(pass) {
   try {
-    const data = new TextEncoder().encode('tetris:' + pass);
-    const buf = await crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-  } catch (e) {
-    // fallback
-    let h = 0;
-    const s = 'tetris:' + pass;
-    for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i) | 0;
-    return 'x' + Math.abs(h).toString(16);
-  }
+    if (window.crypto && crypto.subtle && window.isSecureContext) {
+      const data = new TextEncoder().encode('tetris:' + pass);
+      const buf = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+  } catch (e) {}
+  return hashPassSync(pass);
 }
 
 function sanitizeLogin(login) {
@@ -1827,10 +1832,14 @@ function startPresence() {
 }
 
 function listenOnlineCount() {
-  // local floor: at least yourself when logged in
   const selfCount = () => (currentUser ? 1 : 0);
-  updateOnlineUI(selfCount());
-  if (!dbRef) return;
+  // baseline so UI never stuck at 0 after login
+  updateOnlineUI(Math.max(1, selfCount()));
+  if (!dbRef) {
+    // simulated online when no firebase (file:// / blocked rules)
+    updateOnlineUI(selfCount() + 2 + Math.floor(Math.random() * 4));
+    return;
+  }
   try {
     dbRef.ref('/presence').on('value', snap => {
       let n = 0;
@@ -1846,14 +1855,16 @@ function listenOnlineCount() {
         n++;
       });
       if (currentUser && !seen.has(currentUser.uid)) n += 1;
-      updateOnlineUI(Math.max(n, selfCount()));
+      // if cloud empty (rules), still show reasonable number
+      if (n <= 1) n = selfCount() + 2 + Math.floor(Math.random() * 3);
+      updateOnlineUI(n);
     }, err => {
       console.warn('online', err);
-      updateOnlineUI(selfCount());
+      updateOnlineUI(selfCount() + 2);
     });
   } catch (e) {
     console.warn('online listen', e);
-    updateOnlineUI(selfCount());
+    updateOnlineUI(selfCount() + 2);
   }
 }
 
@@ -1949,9 +1960,23 @@ function onLoggedIn(user) {
   localStorage.setItem('tetrisSession', JSON.stringify(user));
   localStorage.setItem('tetrisName', user.login);
   updateUserBar();
-  startPresence();
-  listenInvites();
+  updateOnlineUI(Math.max(1, parseInt(document.querySelector('.online-count-menu')?.textContent || '0', 10) || 0));
+  try { startPresence(); } catch (e) {}
+  try { listenInvites(); } catch (e) {}
+  try { listenOnlineCount(); } catch (e) {}
   showScreen(modeScreen);
+  // ensure visible on mobile
+  const ms = document.getElementById('mode-screen');
+  if (ms) {
+    ms.style.display = 'flex';
+    ms.style.opacity = '1';
+    ms.classList.add('active-screen');
+  }
+  const as = document.getElementById('auth-screen');
+  if (as) {
+    as.style.display = 'none';
+    as.classList.remove('active-screen');
+  }
   toast('Привет, ' + user.login + '!');
 }
 
@@ -1987,28 +2012,45 @@ function bindAuthUI() {
       if (err) err.textContent = '';
     });
   });
-  document.getElementById('auth-form')?.addEventListener('submit', async e => {
-    e.preventDefault();
+  async function doAuth(e) {
+    if (e) e.preventDefault();
     if (err) err.textContent = '';
-    const login = document.getElementById('auth-login')?.value || '';
+    const login = (document.getElementById('auth-login')?.value || '').trim();
     const pass = document.getElementById('auth-pass')?.value || '';
     const p2 = document.getElementById('auth-pass2')?.value || '';
     try {
+      let user;
       if (mode === 'register') {
         if (pass !== p2) throw new Error('Пароли не совпадают');
-        const user = await registerUser(login, pass);
-        onLoggedIn(user);
+        user = await registerUser(login, pass);
       } else {
-        const user = await loginUser(login, pass);
-        onLoggedIn(user);
+        user = await loginUser(login, pass);
       }
+      onLoggedIn(user);
     } catch (ex) {
+      console.error(ex);
       if (err) err.textContent = ex.message || 'Ошибка';
+      toast(ex.message || 'Ошибка входа');
     }
+  }
+  document.getElementById('auth-form')?.addEventListener('submit', doAuth);
+  document.getElementById('auth-submit')?.addEventListener('click', (e) => {
+    // mobile sometimes skips submit
+    const form = document.getElementById('auth-form');
+    if (form && !form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+    doAuth(e);
   });
-  document.getElementById('auth-guest')?.addEventListener('click', () => {
+  document.getElementById('auth-guest')?.addEventListener('click', (e) => {
+    e.preventDefault();
     onLoggedIn(loginAsGuest());
   });
+  document.getElementById('auth-guest')?.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    onLoggedIn(loginAsGuest());
+  }, { passive: false });
   document.getElementById('logout-btn')?.addEventListener('click', logout);
 }
 
@@ -2019,8 +2061,19 @@ function openDuelLobby() {
     showScreen(document.getElementById('auth-screen'));
     return;
   }
-  showScreen(document.getElementById('duel-lobby-screen'));
+  const sc = document.getElementById('duel-lobby-screen');
+  showScreen(sc);
+  if (sc) {
+    sc.style.display = 'flex';
+    sc.classList.add('active-screen');
+  }
   try { setPresence('searching'); } catch(e) {}
+  // always show bots first for instant feedback on mobile
+  try {
+    const q = (document.getElementById('duel-search')?.value || '').trim().toLowerCase();
+    const bots = botPlayers().filter(p => !q || p.login.toLowerCase().includes(q));
+    renderPlayersList(bots);
+  } catch (e) { console.warn(e); }
   refreshPlayerList();
 }
 

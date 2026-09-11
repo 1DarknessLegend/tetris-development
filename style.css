@@ -1295,3 +1295,51 @@ button:focus { outline: none; }
   margin: 0 auto 8px;
   padding: 0 16px;
 }
+
+/* Auth guest under login */
+#auth-form .auth-guest-btn,
+#auth-guest.auth-guest-btn {
+  width: 100%;
+  margin-top: 10px;
+  display: block;
+  padding: 12px;
+  font-size: 14px;
+}
+#auth-submit {
+  width: 100%;
+  margin-top: 6px;
+}
+
+/* Settings footer button: full width like modes, height like other footer btns */
+.mode-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  max-width: 340px;
+  justify-content: center;
+}
+.mode-footer .ghost-btn {
+  flex: 1 1 40%;
+  min-width: 120px;
+  padding: 12px 10px;
+  font-size: 13px;
+}
+.mode-footer .settings-footer-btn {
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 100%;
+  padding: 12px 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.center-profile {
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
+/* Prevent stray XP in corners */
+body > .profile-bar:not(.center-profile) {
+  display: none !important;
+}

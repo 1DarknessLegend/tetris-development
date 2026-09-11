@@ -23,13 +23,13 @@
       <button type="button" class="auth-tab" data-tab="register">Регистрация</button>
     </div>
     <form id="auth-form" autocomplete="on">
-      <input type="text" id="auth-login" placeholder="Логин" required minlength="3" maxlength="16" autocomplete="username" />
-      <input type="password" id="auth-pass" placeholder="Пароль" required minlength="4" maxlength="32" autocomplete="current-password" />
-      <input type="password" id="auth-pass2" placeholder="Повтор пароля" minlength="4" maxlength="32" style="display:none" autocomplete="new-password" />
+      <input type="text" id="auth-login" name="username" placeholder="Логин" required minlength="3" maxlength="16" autocomplete="username" enterkeyhint="next" />
+      <input type="password" id="auth-pass" name="password" placeholder="Пароль" required minlength="4" maxlength="32" autocomplete="current-password" enterkeyhint="done" />
+      <input type="password" id="auth-pass2" name="password2" placeholder="Повтор пароля" minlength="4" maxlength="32" style="display:none" autocomplete="new-password" />
       <button type="submit" id="auth-submit" class="primary-btn">Войти</button>
+      <button type="button" id="auth-guest" class="ghost-btn auth-guest-btn">Играть как гость</button>
     </form>
     <p id="auth-error" class="auth-error"></p>
-    <button type="button" id="auth-guest" class="ghost-btn">Играть как гость</button>
   </div>
 </div>
 
@@ -45,12 +45,12 @@
   </div>
   <div class="mode-hero">
     <div class="logo big">TETRIS</div>
-    <div class="profile-bar center-profile">
-      <span>Уровень профиля <b id="profile-level">1</b></span>
-      <div class="xp-bar"><div class="xp-fill" id="xp-fill" style="width:0%"></div></div>
-      <span id="profile-xp">0/25 XP</span>
-    </div>
     <p class="mode-sub">выбери режим</p>
+    <div class="profile-bar center-profile" id="menu-profile">
+      <span>Уровень <b id="profile-level">1</b></span>
+      <div class="xp-bar"><div class="xp-fill" id="xp-fill" style="width:0%"></div></div>
+      <span id="profile-xp">0/25</span>
+    </div>
   </div>
   <div class="mode-list">
     <button class="mode-card" data-mode="classic">
@@ -60,8 +60,8 @@
     </button>
     <button class="mode-card" data-mode="sprint">
       <span class="mode-emoji">⚡</span>
-      <span class="mode-name">Спринт 40L</span>
-      <span class="mode-desc">Очисти 40 линий на время</span>
+      <span class="mode-name">Спринт</span>
+      <span class="mode-desc">Очистка 100 линий на время</span>
     </button>
     <button class="mode-card" data-mode="duel">
       <span class="mode-emoji">⚔️</span>
@@ -73,8 +73,7 @@
     <button id="open-achievements" class="ghost-btn">🏆 Достижения</button>
     <button id="open-quests" class="ghost-btn">📋 Квесты</button>
     <button id="open-leaderboard" class="ghost-btn">🏅 Топ</button>
-    <button id="open-season" class="ghost-btn">🎟️ Сезон</button>
-    <button id="open-settings" class="ghost-btn">⚙️</button>
+    <button id="open-settings" class="ghost-btn settings-footer-btn">⚙️ Настройки</button>
   </div></div>
     <span id="profile-xp">0 XP</span>
   </div>
