@@ -45,6 +45,9 @@ let presenceRef = null;
 let dbRef = null;
 let firebaseReady = false;
 let inviteUnsub = null;
+function fbKey(s) {
+  return String(s || 'x').replace(/[.#$\[\]\/]/g, '_');
+}
 
 // Settings
 const settings = Object.assign({
@@ -1789,7 +1792,7 @@ function setPresence(status) {
   try {
     presenceRef.set({
       login: currentUser.login,
-      uid: currentUser.uid,
+      uid: fbKey(currentUser.uid),
       status: status || 'online',
       ts: Date.now()
     });
@@ -1880,19 +1883,21 @@ function listenOnlineCount() {
 function listenInvites() {
   if (!dbRef || !currentUser || currentUser.guest) return;
   try {
-    const ref = dbRef.ref('/duelInvites/' + currentUser.uid);
+    if (inviteUnsub) { try { inviteUnsub(); } catch(e) {} }
+    const myId = fbKey(currentUser.uid);
+    const ref = dbRef.ref('/duelInvites/' + myId);
     const handler = snap => {
-      const box = document.getElementById('duel-incoming');
-      if (!box) return;
+      const box = ensureInviteBox();
       let html = '';
       snap.forEach(c => {
         const v = c.val();
         if (!v || v.status !== 'pending') return;
-        html += `<div data-from="${c.key}">
+        const from = c.key;
+        html += `<div>
           <b>${v.fromName || 'Игрок'}</b> вызывает на дуэль
           <div class="inv-actions">
-            <button type="button" class="btn-accept" data-from="${c.key}" data-name="${v.fromName||''}">Принять</button>
-            <button type="button" class="btn-decline" data-from="${c.key}">Отклонить</button>
+            <button type="button" class="btn-accept" data-from="${from}" data-name="${(v.fromName||'').replace(/"/g,'')}">Принять</button>
+            <button type="button" class="btn-decline" data-from="${from}">Отклонить</button>
           </div>
         </div>`;
       });
@@ -1912,7 +1917,7 @@ function listenInvites() {
     };
     ref.on('value', handler);
     inviteUnsub = () => ref.off('value', handler);
-  } catch (e) {}
+  } catch (e) { console.warn('invites', e); }
 }
 
 async function registerUser(login, pass) {
@@ -2077,6 +2082,20 @@ function openDuelLobby() {
   }
   try { setPresence('searching'); } catch (e) {}
   refreshPlayerList();
+  // ensure invite UI exists even outside lobby
+  ensureInviteBox();
+}
+
+function ensureInviteBox() {
+  let box = document.getElementById('duel-incoming');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'duel-incoming';
+    box.className = 'duel-incoming';
+    box.style.display = 'none';
+    document.body.appendChild(box);
+  }
+  return box;
 }
 
 function renderPlayersList(players) {
@@ -2089,12 +2108,13 @@ function renderPlayersList(players) {
   list.innerHTML = players.map(p => {
     const st = p.status === 'in_game' ? 'в игре' : p.status === 'searching' ? 'ищет дуэль' : 'онлайн';
     const busy = p.status === 'in_game';
+    const uid = fbKey(p.uid || p.login);
     return `<div class="list-item">
       <div class="li-body" style="flex:1">
         <div class="li-name">${p.login}</div>
         <div class="player-status ${busy ? 'busy' : ''}">${st}</div>
       </div>
-      <button type="button" class="challenge-btn" data-uid="${p.uid}" data-name="${p.login}" ${busy ? 'disabled' : ''}>Вызвать</button>
+      <button type="button" class="challenge-btn" data-uid="${uid}" data-name="${(p.login||'').replace(/"/g,'')}" ${busy ? 'disabled' : ''}>Вызвать</button>
     </div>`;
   }).join('');
   list.querySelectorAll('.challenge-btn').forEach(btn => {
@@ -2111,16 +2131,18 @@ function refreshPlayerList() {
     list.innerHTML = '<div class="list-item"><div class="li-desc">Нет сети — дуэль только онлайн</div></div>';
     return;
   }
+  const myId = fbKey(currentUser.uid);
   dbRef.ref('/presence').once('value').then(snap => {
     const players = [];
     const now = Date.now();
     snap.forEach(c => {
       const v = c.val();
       if (!v || !v.login) return;
-      if (currentUser && String(v.uid) === String(currentUser.uid)) return;
+      const id = fbKey(v.uid || c.key);
+      if (id === myId) return;
       if (v.ts && now - v.ts > 45000) return;
       if (q && !String(v.login).toLowerCase().includes(q)) return;
-      players.push(v);
+      players.push({ login: v.login, uid: id, status: v.status || 'online', ts: v.ts });
     });
     players.sort((a, b) => String(a.login).localeCompare(String(b.login)));
     renderPlayersList(players);
@@ -2135,139 +2157,163 @@ function challengePlayer(uid, name) {
     toast('Для вызова нужна регистрация');
     return;
   }
-  const inviteRef = dbRef.ref('/duelInvites/' + uid + '/' + currentUser.uid);
-  inviteRef.set({
-    fromName: currentUser.login,
-    fromUid: currentUser.uid,
+  const myId = fbKey(currentUser.uid);
+  const theirId = fbKey(uid);
+  // Create room first — both will watch this room
+  const roomId = dbRef.ref('/duelRooms').push().key;
+  const room = {
+    host: myId,
+    hostName: currentUser.login,
+    guest: theirId,
+    guestName: name || 'Игрок',
+    hostScore: 0,
+    guestScore: 0,
     status: 'pending',
+    target: settings.duelTarget || 5000,
     ts: Date.now()
+  };
+  dbRef.ref('/duelRooms/' + roomId).set(room).then(() => {
+    // invite to opponent
+    return dbRef.ref('/duelInvites/' + theirId + '/' + myId).set({
+      fromName: currentUser.login,
+      fromUid: myId,
+      roomId,
+      status: 'pending',
+      ts: Date.now()
+    });
   }).then(() => {
-    toast('Вызов отправлен: ' + name + ' — ждём ответа...');
-    // Challenger listens for accept → both enter game
-    if (window._challengeUnsub) { try { window._challengeUnsub(); } catch(e) {} }
-    const myRespRef = dbRef.ref('/duelInvites/' + currentUser.uid + '/' + uid);
+    toast('Вызов отправлен: ' + name + ' — ждём...');
+    // Challenger watches room → when active, enter game
+    if (window._roomWaitUnsub) { try { window._roomWaitUnsub(); } catch(e) {} }
+    const roomRef = dbRef.ref('/duelRooms/' + roomId);
     const handler = (s) => {
       const v = s.val();
       if (!v) return;
-      if (v.status === 'accepted' && v.roomId) {
-        myRespRef.off('value', handler);
-        window._challengeUnsub = null;
-        // clean response
-        try { myRespRef.remove(); } catch(e) {}
-        try { inviteRef.remove(); } catch(e) {}
-        const room = {
-          host: currentUser.uid,
-          hostName: currentUser.login,
-          guest: uid,
-          guestName: name || v.fromName || 'Игрок',
-          hostScore: 0,
-          guestScore: 0,
-          status: 'active',
-          target: settings.duelTarget || 5000,
-          ts: Date.now()
-        };
-        // ensure room exists / merge
-        dbRef.ref('/duelRooms/' + v.roomId).once('value').then(rs => {
-          const existing = rs.val();
-          startDuelWithRoom(v.roomId, existing || room);
-        }).catch(() => startDuelWithRoom(v.roomId, room));
-      } else if (v.status === 'declined') {
-        myRespRef.off('value', handler);
-        window._challengeUnsub = null;
-        try { myRespRef.remove(); } catch(e) {}
-        toast('Вызов отклонён');
+      if (v.status === 'active') {
+        roomRef.off('value', handler);
+        window._roomWaitUnsub = null;
+        startDuelWithRoom(roomId, v);
+      } else if (v.status === 'declined' || v.status === 'cancelled') {
+        roomRef.off('value', handler);
+        window._roomWaitUnsub = null;
+        try { roomRef.remove(); } catch(e) {}
+        toast(v.status === 'declined' ? 'Вызов отклонён' : 'Вызов отменён');
       }
     };
-    myRespRef.on('value', handler);
-    window._challengeUnsub = () => myRespRef.off('value', handler);
-    // timeout 60s
+    roomRef.on('value', handler);
+    window._roomWaitUnsub = () => roomRef.off('value', handler);
     setTimeout(() => {
-      if (window._challengeUnsub) {
-        try { window._challengeUnsub(); } catch(e) {}
-        window._challengeUnsub = null;
-        try { inviteRef.remove(); } catch(e) {}
+      if (window._roomWaitUnsub) {
+        try { window._roomWaitUnsub(); } catch(e) {}
+        window._roomWaitUnsub = null;
+        roomRef.once('value').then(s => {
+          const v = s.val();
+          if (v && v.status === 'pending') {
+            roomRef.update({ status: 'cancelled' });
+            try { dbRef.ref('/duelInvites/' + theirId + '/' + myId).remove(); } catch(e) {}
+          }
+        });
       }
     }, 60000);
-  }).catch(() => toast('Не удалось отправить вызов'));
+  }).catch((e) => {
+    console.warn(e);
+    toast('Не удалось отправить вызов');
+  });
 }
 
 function declineInvite(fromUid) {
   if (!dbRef || !currentUser) return;
-  dbRef.ref('/duelInvites/' + currentUser.uid + '/' + fromUid).remove();
-  // notify challenger
-  dbRef.ref('/duelInvites/' + fromUid + '/' + currentUser.uid).set({
-    status: 'declined',
-    fromName: currentUser.login,
-    ts: Date.now()
+  const myId = fbKey(currentUser.uid);
+  const theirId = fbKey(fromUid);
+  dbRef.ref('/duelInvites/' + myId + '/' + theirId).once('value').then(s => {
+    const v = s.val();
+    if (v && v.roomId) {
+      dbRef.ref('/duelRooms/' + v.roomId).update({ status: 'declined' });
+    }
+    dbRef.ref('/duelInvites/' + myId + '/' + theirId).remove();
   });
 }
 
 function acceptInvite(fromUid, fromName) {
   if (!dbRef || !currentUser) return;
-  const roomId = dbRef.ref('/duelRooms').push().key;
-  const room = {
-    host: fromUid,
-    hostName: fromName || 'Игрок',
-    guest: currentUser.uid,
-    guestName: currentUser.login,
-    hostScore: 0,
-    guestScore: 0,
-    status: 'active',
-    target: settings.duelTarget || 5000,
-    ts: Date.now()
-  };
-  dbRef.ref('/duelRooms/' + roomId).set(room).then(() => {
-    // remove pending invite to me
-    dbRef.ref('/duelInvites/' + currentUser.uid + '/' + fromUid).remove();
-    // notify challenger → they also enter game
-    dbRef.ref('/duelInvites/' + fromUid + '/' + currentUser.uid).set({
-      status: 'accepted',
-      roomId,
-      fromName: currentUser.login,
-      fromUid: currentUser.uid,
+  const myId = fbKey(currentUser.uid);
+  const theirId = fbKey(fromUid);
+  const invRef = dbRef.ref('/duelInvites/' + myId + '/' + theirId);
+  invRef.once('value').then(s => {
+    const inv = s.val();
+    if (!inv || !inv.roomId) {
+      toast('Вызов устарел');
+      invRef.remove();
+      return;
+    }
+    const roomId = inv.roomId;
+    const roomRef = dbRef.ref('/duelRooms/' + roomId);
+    return roomRef.update({
+      status: 'active',
+      guest: myId,
+      guestName: currentUser.login,
+      guestScore: 0,
       ts: Date.now()
+    }).then(() => invRef.remove()).then(() => {
+      return roomRef.once('value');
+    }).then(rs => {
+      startDuelWithRoom(roomId, rs.val());
     });
-    startDuelWithRoom(roomId, room);
-  }).catch(() => toast('Не удалось начать дуэль'));
+  }).catch((e) => {
+    console.warn(e);
+    toast('Не удалось принять вызов');
+  });
 }
 
 function startDuelWithRoom(roomId, room) {
+  if (!roomId) return;
+  // prevent double-start
+  if (window._duelStarting) return;
+  window._duelStarting = true;
+  setTimeout(() => { window._duelStarting = false; }, 1500);
+
   if (window._botTimer) { clearInterval(window._botTimer); window._botTimer = null; }
+  if (window._roomWaitUnsub) { try { window._roomWaitUnsub(); } catch(e) {} window._roomWaitUnsub = null; }
+
   duelId = roomId;
   gameMode = 'duel';
   duelOppScore = 0;
   ensureAudio();
-  startGame();
+  try { startGame(); } catch (e) { console.error(e); }
   stopDuelListenersOnly();
-  if (!dbRef) {
-    showScreen(gameDiv);
-    paused = false;
-    return;
+
+  if (dbRef) {
+    const ref = dbRef.ref('/duelRooms/' + roomId);
+    const handler = s => {
+      const v = s.val();
+      if (!v) return;
+      const myId = currentUser ? fbKey(currentUser.uid) : '';
+      const isHost = myId && String(v.host) === myId;
+      duelOppScore = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
+      const el = document.getElementById('duel-opp');
+      if (el) el.textContent = String(duelOppScore);
+      const target = settings.duelTarget || 5000;
+      if (duelOppScore >= target && score < target && !gameOver) {
+        endGame(false);
+        toast('Поражение в дуэли');
+      }
+    };
+    ref.on('value', handler);
+    duelUnsub = () => ref.off('value', handler);
   }
-  const ref = dbRef.ref('/duelRooms/' + roomId);
-  const handler = s => {
-    const v = s.val();
-    if (!v) return;
-    const isHost = currentUser && String(v.host) === String(currentUser.uid);
-    duelOppScore = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
-    const el = document.getElementById('duel-opp');
-    if (el) el.textContent = String(duelOppScore);
-    const target = settings.duelTarget || 5000;
-    if (duelOppScore >= target && score < target && !gameOver) {
-      endGame(false);
-      toast('Поражение в дуэли');
-    }
-  };
-  ref.on('value', handler);
-  duelUnsub = () => ref.off('value', handler);
+
   showScreen(gameDiv);
+  if (gameDiv) {
+    gameDiv.style.display = 'flex';
+    gameDiv.classList.add('active-screen');
+  }
   paused = false;
   gameOver = false;
   const dc = document.getElementById('duel-card');
   if (dc) dc.style.display = '';
   const el = document.getElementById('duel-opp');
   if (el) el.textContent = '0';
-  setPresence('in_game');
+  try { setPresence('in_game'); } catch (e) {}
   toast('⚔️ Дуэль началась!');
 }
 
@@ -2280,6 +2326,7 @@ publishDuelScore = function() {
   if (gameMode !== 'duel' || !duelId) return;
   if (dbRef && currentUser) {
     try {
+      const myId = fbKey(currentUser.uid);
       const ref = dbRef.ref('/duelRooms/' + duelId);
       ref.once('value').then(s => {
         const v = s.val();
@@ -2287,8 +2334,8 @@ publishDuelScore = function() {
           if (_publishDuelScoreOrig) _publishDuelScoreOrig();
           return;
         }
-        if (String(v.host) === String(currentUser.uid)) ref.update({ hostScore: score });
-        else if (String(v.guest) === String(currentUser.uid)) ref.update({ guestScore: score });
+        if (String(v.host) === myId) ref.update({ hostScore: score });
+        else if (String(v.guest) === myId) ref.update({ guestScore: score });
       });
       return;
     } catch (e) {}
@@ -2307,63 +2354,68 @@ function quickMatch() {
   }
   toast('⚡ Ищем соперника...');
   setPresence('searching');
+  const myId = fbKey(currentUser.uid);
   const waiting = dbRef.ref('/duelWaiting');
   waiting.once('value').then(snap => {
     let joined = false;
     snap.forEach(child => {
       if (joined) return;
       const v = child.val();
-      if (v && v.status === 'waiting' && String(v.host) !== String(currentUser.uid)) {
+      if (v && v.status === 'waiting' && String(v.host) !== myId) {
         joined = true;
         const roomId = child.key;
-        child.ref.update({
-          status: 'active',
-          guest: currentUser.uid,
-          guestName: currentUser.login,
-          guestScore: 0
-        });
         const room = {
-          host: v.host, hostName: v.hostName || 'Игрок',
-          guest: currentUser.uid, guestName: currentUser.login,
-          hostScore: 0, guestScore: 0, status: 'active',
-          target: settings.duelTarget || 5000, ts: Date.now()
+          host: v.host,
+          hostName: v.hostName || 'Игрок',
+          guest: myId,
+          guestName: currentUser.login,
+          hostScore: 0,
+          guestScore: 0,
+          status: 'active',
+          target: settings.duelTarget || 5000,
+          ts: Date.now()
         };
-        dbRef.ref('/duelRooms/' + roomId).set(room).then(() => {
-          startDuelWithRoom(roomId, room);
-        });
+        child.ref.update({ status: 'active', guest: myId, guestName: currentUser.login }).then(() => {
+          return dbRef.ref('/duelRooms/' + roomId).set(room);
+        }).then(() => startDuelWithRoom(roomId, room));
       }
     });
     if (!joined) {
       const ref = waiting.push({
-        host: currentUser.uid, hostName: currentUser.login,
-        hostScore: 0, guestScore: 0, status: 'waiting', ts: Date.now()
+        host: myId,
+        hostName: currentUser.login,
+        hostScore: 0,
+        guestScore: 0,
+        status: 'waiting',
+        ts: Date.now()
       });
-      duelId = ref.key;
       toast('Ждём соперника...');
       const handler = s => {
         const v = s.val();
         if (!v) return;
         if (v.status === 'active' && v.guest) {
           ref.off('value', handler);
+          const roomId = ref.key;
           const room = {
-            host: currentUser.uid, hostName: currentUser.login,
-            guest: v.guest, guestName: v.guestName || 'Игрок',
-            hostScore: 0, guestScore: 0, status: 'active',
-            target: settings.duelTarget || 5000, ts: Date.now()
+            host: myId,
+            hostName: currentUser.login,
+            guest: v.guest,
+            guestName: v.guestName || 'Игрок',
+            hostScore: 0,
+            guestScore: 0,
+            status: 'active',
+            target: settings.duelTarget || 5000,
+            ts: Date.now()
           };
-          dbRef.ref('/duelRooms/' + ref.key).set(room).then(() => {
-            startDuelWithRoom(ref.key, room);
-          });
+          dbRef.ref('/duelRooms/' + roomId).set(room).then(() => startDuelWithRoom(roomId, room));
         }
       };
       ref.on('value', handler);
-      // cancel wait after 60s
       setTimeout(() => {
         try { ref.off('value', handler); } catch(e) {}
         try {
           ref.once('value').then(s => {
-            const v = s.val();
-            if (v && v.status === 'waiting') ref.remove();
+            if (s.val() && s.val().status === 'waiting') ref.remove();
           });
         } catch(e) {}
       }, 60000);

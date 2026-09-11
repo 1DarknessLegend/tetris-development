@@ -1546,3 +1546,11 @@ body > .profile-bar:not(.center-profile) {
 #logout-btn {
   order: 2;
 }
+
+#duel-incoming.duel-incoming {
+  z-index: 9999 !important;
+  position: fixed !important;
+  bottom: 24px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+}
