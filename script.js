@@ -78,23 +78,38 @@ themes.forEach(t => { bought[t] = !!savedBought[t]; active[t] = false; });
 // ===================== ACHIEVEMENTS =====================
 const ACHIEVEMENTS = [
   { id: 'first_line', name: 'Первая линия', desc: 'Очисти 1 линию', check: s => s.totalLines >= 1 },
-  { id: 'lines_40', name: 'Спринтер', desc: 'Очисти 40 линий за всё время', check: s => s.totalLines >= 40 },
+  { id: 'lines_10', name: 'Разминка', desc: 'Очисти 10 линий', check: s => s.totalLines >= 10 },
+  { id: 'lines_40', name: 'Спринтер', desc: 'Очисти 40 линий', check: s => s.totalLines >= 40 },
+  { id: 'lines_100', name: 'Сотня', desc: 'Очисти 100 линий', check: s => s.totalLines >= 100 },
   { id: 'lines_200', name: 'Марафонец', desc: 'Очисти 200 линий', check: s => s.totalLines >= 200 },
+  { id: 'lines_500', name: 'Ветеран', desc: 'Очисти 500 линий', check: s => s.totalLines >= 500 },
+  { id: 'score_1k', name: '1K', desc: 'Набери 1000 очков за игру', check: s => s.bestScore >= 1000 },
   { id: 'score_5k', name: '5K', desc: 'Набери 5000 очков за игру', check: s => s.bestScore >= 5000 },
   { id: 'score_20k', name: '20K', desc: 'Набери 20000 очков за игру', check: s => s.bestScore >= 20000 },
+  { id: 'score_50k', name: '50K', desc: 'Набери 50000 очков за игру', check: s => s.bestScore >= 50000 },
   { id: 'tetris', name: 'Тетрис!', desc: 'Очисти 4 линии сразу', check: s => s.tetrises >= 1 },
+  { id: 'tetris5', name: 'Тетрис x5', desc: 'Сделай 5 тетрисов', check: s => s.tetrises >= 5 },
   { id: 'combo3', name: 'Комбо x3', desc: 'Сделай комбо x3', check: s => s.maxCombo >= 3 },
   { id: 'combo5', name: 'Комбо x5', desc: 'Сделай комбо x5', check: s => s.maxCombo >= 5 },
-  { id: 'level10', name: 'Уровень 10', desc: 'Достигни 10 уровня', check: s => s.maxLevel >= 10 },
+  { id: 'combo8', name: 'Комбо x8', desc: 'Сделай комбо x8', check: s => s.maxCombo >= 8 },
+  { id: 'level5', name: 'Уровень 5', desc: 'Достигни 5 уровня в игре', check: s => s.maxLevel >= 5 },
+  { id: 'level10', name: 'Уровень 10', desc: 'Достигни 10 уровня в игре', check: s => s.maxLevel >= 10 },
+  { id: 'level15', name: 'Уровень 15', desc: 'Достигни 15 уровня в игре', check: s => s.maxLevel >= 15 },
   { id: 'sprint_finish', name: 'Спринт пройден', desc: 'Пройди спринт 40L', check: s => s.sprints >= 1 },
+  { id: 'sprint3', name: 'Спринт x3', desc: 'Пройди спринт 3 раза', check: s => s.sprints >= 3 },
   { id: 'buyer', name: 'Шопоголик', desc: 'Купи 3 темы', check: s => s.themesBought >= 3 },
   { id: 'collector', name: 'Коллекционер', desc: 'Купи 10 тем', check: s => s.themesBought >= 10 },
   { id: 'case_open', name: 'Удача', desc: 'Открой кейс', check: s => s.casesOpened >= 1 },
+  { id: 'case5', name: 'Кладоискатель', desc: 'Открой 5 кейсов', check: s => s.casesOpened >= 5 },
   { id: 'tspin', name: 'T-Spin', desc: 'Сделай T-Spin', check: s => (s.tspins || 0) >= 1 },
-  { id: 'hunger_surv', name: 'Выживший', desc: 'Очисти 20 линий в Голоде', check: s => (s.hungerLines || 0) >= 20 },
-  { id: 'profile_5', name: 'Уровень 5', desc: 'Профиль 5 уровня', check: s => profileLevel() >= 5 },
-  { id: 'profile_10', name: 'Уровень 10', desc: 'Профиль 10 уровня', check: s => profileLevel() >= 10 },
+  { id: 'tspin5', name: 'T-Spin мастер', desc: 'Сделай 5 T-Spin', check: s => (s.tspins || 0) >= 5 },
+  { id: 'profile_3', name: 'Профиль 3', desc: 'Профиль 3 уровня', check: s => profileLevel() >= 3 },
+  { id: 'profile_5', name: 'Профиль 5', desc: 'Профиль 5 уровня', check: s => profileLevel() >= 5 },
+  { id: 'profile_10', name: 'Профиль 10', desc: 'Профиль 10 уровня', check: s => profileLevel() >= 10 },
   { id: 'duel_win', name: 'Дуэлянт', desc: 'Выиграй дуэль', check: s => (s.duelWins || 0) >= 1 },
+  { id: 'duel3', name: 'Гладиатор', desc: 'Выиграй 3 дуэли', check: s => (s.duelWins || 0) >= 3 },
+  { id: 'games10', name: 'Игрок', desc: 'Сыграй 10 партий', check: s => (s.gamesPlayed || 0) >= 10 },
+  { id: 'games50', name: 'Завсегдатай', desc: 'Сыграй 50 партий', check: s => (s.gamesPlayed || 0) >= 50 },
 ];
 
 let stats = JSON.parse(localStorage.getItem('tetrisStats') || '{}');
@@ -158,18 +173,26 @@ function todayKey() {
 }
 
 const QUEST_POOL = [
-  { id: 'q_lines10', name: 'Очисти 10 линий', target: 10, reward: 'lines', reward: 300 },
-  { id: 'q_lines25', name: 'Очисти 25 линий', target: 25, key: 'lines', reward: 600 },
+  { id: 'q_lines5', name: 'Очисти 5 линий', target: 5, key: 'lines', reward: 150 },
+  { id: 'q_lines10', name: 'Очисти 10 линий', target: 10, key: 'lines', reward: 300 },
+  { id: 'q_lines20', name: 'Очисти 20 линий', target: 20, key: 'lines', reward: 450 },
+  { id: 'q_lines40', name: 'Очисти 40 линий', target: 40, key: 'lines', reward: 800 },
+  { id: 'q_score1k', name: 'Набери 1000 очков', target: 1000, key: 'score', reward: 250 },
   { id: 'q_score2k', name: 'Набери 2000 очков', target: 2000, key: 'score', reward: 400 },
+  { id: 'q_score5k', name: 'Набери 5000 очков', target: 5000, key: 'score', reward: 700 },
   { id: 'q_tetris', name: 'Сделай 1 тетрис', target: 1, key: 'tetris', reward: 500 },
+  { id: 'q_tetris3', name: 'Сделай 3 тетриса', target: 3, key: 'tetris', reward: 900 },
   { id: 'q_combo', name: 'Комбо x3', target: 3, key: 'combo', reward: 450 },
-  { id: 'q_play', name: 'Сыграй 3 партии', target: 3, key: 'games', reward: 350 },
+  { id: 'q_combo5', name: 'Комбо x5', target: 5, key: 'combo', reward: 700 },
+  { id: 'q_play', name: 'Сыграй 2 партии', target: 2, key: 'games', reward: 200 },
+  { id: 'q_play3', name: 'Сыграй 3 партии', target: 3, key: 'games', reward: 350 },
+  { id: 'q_play5', name: 'Сыграй 5 партий', target: 5, key: 'games', reward: 500 },
 ];
 
 let quests = JSON.parse(localStorage.getItem('tetrisQuests') || 'null');
 if (!quests || quests.date !== todayKey()) {
   // pick 3 random
-  const shuffled = QUEST_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+  const shuffled = QUEST_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 4);
   quests = {
     date: todayKey(),
     items: shuffled.map(q => ({ ...q, progress: 0, claimed: false }))
@@ -334,6 +357,7 @@ function themeOfDay() {
   return list[day % list.length];
 }
 function setupThemeOfDay() {
+  if (!document.getElementById('theme-of-day')) return;
   const tid = themeOfDay();
   const nameEl = document.getElementById('tod-name');
   if (nameEl) nameEl.textContent = tid;
@@ -375,7 +399,7 @@ function updateScore() {
   }
   if (gameMode === 'duel') {
     publishDuelScore();
-    if (score >= 3000 && !gameOver) {
+    if (score >= (settings.duelTarget || 3000) && !gameOver) {
       endGame(true);
       toast('⚔️ Победа в дуэли!');
     }
@@ -625,22 +649,54 @@ document.getElementById('season-back')?.addEventListener('click', () => showScre
 function bindSettings() {
   const map = [
     ['set-sound', 'sound', 'checked'],
+    ['set-music', 'music', 'checked'],
     ['set-vibrate', 'vibrate', 'checked'],
     ['set-ghost', 'ghost', 'checked'],
+    ['set-grid', 'grid', 'checked'],
+    ['set-particles', 'particles', 'checked'],
+    ['set-shake', 'shake', 'checked'],
     ['set-skin', 'skin', 'value'],
     ['set-das', 'das', 'value'],
     ['set-arr', 'arr', 'value'],
+    ['set-duel-target', 'duelTarget', 'value'],
   ];
   map.forEach(([id, key, prop]) => {
     const el = document.getElementById(id);
     if (!el) return;
     if (prop === 'checked') el.checked = !!settings[key];
-    else el.value = String(settings[key]);
+    else el.value = String(settings[key] ?? '');
     el.addEventListener('change', () => {
-      settings[key] = prop === 'checked' ? el.checked : ((key === 'das' || key === 'arr') ? +el.value : el.value);
+      if (prop === 'checked') settings[key] = el.checked;
+      else if (key === 'das' || key === 'arr' || key === 'duelTarget') settings[key] = +el.value;
+      else settings[key] = el.value;
       if (key === 'skin') colors = SKINS[settings.skin] || SKINS.classic;
+      if (key === 'music' && !settings.music) {
+        try { if (mellMusic) mellMusic.pause(); Object.values(vids).forEach(v => v.pause()); } catch(e) {}
+      }
       saveSettings();
     });
+  });
+  const nick = document.getElementById('set-nickname');
+  if (nick) {
+    nick.value = settings.nickname || (currentUser && currentUser.login) || '';
+    nick.addEventListener('change', () => {
+      settings.nickname = nick.value.trim().slice(0, 16);
+      saveSettings();
+      if (settings.nickname) {
+        localStorage.setItem('tetrisName', settings.nickname);
+        if (currentUser && !currentUser.guest) {
+          // keep account login, only display name for boards
+        }
+      }
+    });
+  }
+  document.getElementById('set-reset-stats')?.addEventListener('click', () => {
+    if (!confirm('Сбросить локальную статистику, достижения и квесты?')) return;
+    localStorage.removeItem('tetrisStats');
+    localStorage.removeItem('tetrisQuests');
+    localStorage.removeItem('tetrisSeason');
+    localStorage.removeItem('tetrisLocalScores');
+    location.reload();
   });
   colors = SKINS[settings.skin] || SKINS.classic;
 }
@@ -700,47 +756,109 @@ function renderLeaderboardRows(rows, list, source) {
   ).join('') + `<div class="list-item"><div class="li-desc" style="text-align:center;width:100%">Источник: ${source}</div></div>`;
 }
 
+let lbTab = 'score';
+
+function getLocalLevels() {
+  try { return JSON.parse(localStorage.getItem('tetrisLocalLevels') || '[]') || []; }
+  catch(e) { return []; }
+}
+
+function saveLocalLevel() {
+  if (!currentUser) return;
+  const name = settings.nickname || currentUser.login || getPlayerName();
+  const level = profileLevel();
+  let rows = getLocalLevels().filter(r => r.name !== name);
+  rows.push({ name, level, lines: stats.totalLines || 0, ts: Date.now() });
+  rows.sort((a,b) => (b.level||0) - (a.level||0) || (b.lines||0) - (a.lines||0));
+  rows = rows.slice(0, 30);
+  localStorage.setItem('tetrisLocalLevels', JSON.stringify(rows));
+  if (dbRef) {
+    try {
+      dbRef.ref('/levels/' + encodeURIComponent(name)).set({ name, level, lines: stats.totalLines || 0, ts: Date.now() });
+    } catch(e) {}
+  }
+}
+
+function demoPlayers() {
+  return [
+    { name: 'ProGamer', score: 42000, level: 12, mode: 'classic' },
+    { name: 'TetrisKing', score: 35500, level: 10, mode: 'sprint' },
+    { name: 'LineClear', score: 28000, level: 9, mode: 'classic' },
+    { name: 'ComboMaster', score: 21000, level: 8, mode: 'classic' },
+    { name: 'PixelDrop', score: 15000, level: 6, mode: 'sprint' },
+    { name: 'BlockNinja', score: 12000, level: 5, mode: 'classic' },
+    { name: 'StackAttack', score: 9000, level: 4, mode: 'classic' },
+    { name: 'SoftDrop', score: 6500, level: 3, mode: 'sprint' },
+  ];
+}
+
 function renderLeaderboard() {
   const list = document.getElementById('leaderboard-list');
   if (!list) return;
-  const local = getLocalScores().sort((a,b) => (b.score||0)-(a.score||0));
   list.innerHTML = '<div class="list-item"><div class="li-desc">Загрузка...</div></div>';
+  saveLocalLevel();
 
-  // Always show local first so something works offline
-  renderLeaderboardRows(local, list, 'локальный');
-
-  try {
-    if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) {
-      return;
-    }
-    // Prefer simple fetch without orderBy (no index required), then sort client-side
-    firebase.database().ref('/scores').limitToLast(50).once('value')
-      .then(snap => {
-        const rows = [];
-        snap.forEach(c => { const v = c.val(); if (v && typeof v.score === 'number') rows.push(v); });
-        rows.sort((a,b) => b.score - a.score);
-        // merge with local
-        const merged = rows.concat(local);
-        const seen = new Set();
-        const uniq = [];
-        merged.sort((a,b) => b.score - a.score);
-        for (const r of merged) {
-          const k = (r.name||'') + '|' + r.score + '|' + (r.ts||'');
-          if (seen.has(k)) continue;
-          seen.add(k);
-          uniq.push(r);
-          if (uniq.length >= 20) break;
-        }
-        renderLeaderboardRows(uniq, list, rows.length ? 'онлайн + локальный' : 'локальный');
-      })
-      .catch(err => {
-        console.warn('leaderboard', err);
-        renderLeaderboardRows(local, list, 'локальный (сеть недоступна)');
-      });
-  } catch (e) {
-    renderLeaderboardRows(local, list, 'локальный');
+  if (lbTab === 'level') {
+    const local = getLocalLevels();
+    const demo = demoPlayers().map(d => ({ name: d.name, level: d.level, lines: d.level * 25 }));
+    let rows = local.concat(demo);
+    const loadCloud = dbRef
+      ? dbRef.ref('/levels').limitToLast(40).once('value').then(snap => {
+          snap.forEach(c => { const v = c.val(); if (v && v.name) rows.push(v); });
+        }).catch(() => {})
+      : Promise.resolve();
+    loadCloud.finally(() => {
+      const seen = new Set();
+      const uniq = [];
+      rows.sort((a,b) => (b.level||0) - (a.level||0) || (b.lines||0) - (a.lines||0));
+      for (const r of rows) {
+        const k = String(r.name||'').toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        uniq.push(r);
+        if (uniq.length >= 20) break;
+      }
+      list.innerHTML = uniq.map((r,i) =>
+        `<div class="list-item"><div class="li-icon">${i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1)}</div>
+        <div class="li-body"><div class="li-name">${r.name||'?'}</div>
+        <div class="li-desc">Ур. ${r.level||1} · ${r.lines||0} линий</div></div></div>`
+      ).join('') || '<div class="list-item"><div class="li-desc">Пусто</div></div>';
+    });
+    return;
   }
+
+  // score tab
+  const local = getLocalScores();
+  const demo = demoPlayers().map(d => ({ name: d.name, score: d.score, mode: d.mode }));
+  let rows = local.concat(demo);
+  const loadCloud = (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length)
+    ? firebase.database().ref('/scores').limitToLast(50).once('value').then(snap => {
+        snap.forEach(c => { const v = c.val(); if (v && typeof v.score === 'number') rows.push(v); });
+      }).catch(() => {})
+    : Promise.resolve();
+  loadCloud.finally(() => {
+    const seen = new Set();
+    const uniq = [];
+    rows.sort((a,b) => (b.score||0) - (a.score||0));
+    for (const r of rows) {
+      const k = (r.name||'') + '|' + r.score;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      uniq.push(r);
+      if (uniq.length >= 20) break;
+    }
+    renderLeaderboardRows(uniq, list, 'игроки');
+  });
 }
+
+document.querySelectorAll('.lb-tabs .auth-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    lbTab = tab.getAttribute('data-lb') || 'score';
+    document.querySelectorAll('.lb-tabs .auth-tab').forEach(t => t.classList.toggle('active', t === tab));
+    renderLeaderboard();
+  });
+});
+
 
 // ===================== CASE =====================
 const caseBtn = document.getElementById('case-btn');
@@ -992,7 +1110,7 @@ function draw() {
 
   // shake
   const boardWrap = document.getElementById('board-wrap');
-  if (shakeTime > 0 && boardWrap) {
+  if (settings.shake && shakeTime > 0 && boardWrap) {
     const s = Math.min(shakeTime, 200) / 100;
     boardWrap.style.transform = `translate(${(Math.random()-0.5)*s*4}px, ${(Math.random()-0.5)*s*4}px)`;
   } else if (boardWrap) {
@@ -1025,10 +1143,12 @@ function draw() {
   ctx.setTransform(20, 0, 0, 20, 0, 0);
 
   // grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.lineWidth = 0.03;
-  for (let x = 0; x <= 12; x++) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 20); ctx.stroke(); }
-  for (let y = 0; y <= 20; y++) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(12, y); ctx.stroke(); }
+  if (settings.grid) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 0.03;
+    for (let x = 0; x <= 12; x++) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 20); ctx.stroke(); }
+    for (let y = 0; y <= 20; y++) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(12, y); ctx.stroke(); }
+  }
 
   drawMatrix(arena, { x: 0, y: 0 });
   // line clear flash
@@ -1043,7 +1163,7 @@ function draw() {
     if (gy >= 0) drawMatrix(player.matrix, { x: player.pos.x, y: gy }, 0.25);
   }
   if (player.matrix) drawMatrix(player.matrix, player.pos);
-  drawParticles();
+  if (settings.particles) drawParticles();
   drawNextPiece();
   drawHoldPiece();
 
@@ -1097,7 +1217,7 @@ function arenaSweep() {
     if (combo >= 3) questProgress('combo', combo);
     updateProfileUI();
 
-    clearedYs.forEach(y => spawnParticles(y, 18));
+    if (settings.particles) clearedYs.forEach(y => spawnParticles(y, 18));
     lineFlashRows = clearedYs.slice();
     lineFlashTime = 180;
     if (rowCount >= 4) {
@@ -1404,7 +1524,7 @@ function listenDuel() {
     const el = document.getElementById('duel-opp');
     if (el) el.textContent = duelOppScore;
     // win/lose check
-    if (duelOppScore >= 3000 && score < 3000 && !gameOver) {
+    if (duelOppScore >= (settings.duelTarget || 3000) && score < (settings.duelTarget || 3000) && !gameOver) {
       endGame(false);
       toast('Поражение в дуэли');
     }
@@ -1464,11 +1584,15 @@ function startGame() {
     if (dc) dc.style.display = 'none';
   }
   questProgress('games', 1);
+  stats.gamesPlayed = (stats.gamesPlayed || 0) + 1;
+  saveStats();
+  checkAchievements();
 }
 
 function endGame(won) {
   gameOver = true;
   paused = true;
+  if (window._botTimer) { clearInterval(window._botTimer); window._botTimer = null; }
   publishDuelScore();
   sfx('gameover');
   if (score > stats.bestScore) { stats.bestScore = score; saveStats(); }
@@ -1658,7 +1782,7 @@ async function hashPass(pass) {
 }
 
 function sanitizeLogin(login) {
-  return String(login || '').trim().toLowerCase().replace(/[^a-z0-9_а-яё]/gi, '').slice(0, 16);
+  return String(login || '').trim().replace(/\s+/g, '_').slice(0, 16);
 }
 
 function updateOnlineUI(n) {
@@ -1703,21 +1827,33 @@ function startPresence() {
 }
 
 function listenOnlineCount() {
+  // local floor: at least yourself when logged in
+  const selfCount = () => (currentUser ? 1 : 0);
+  updateOnlineUI(selfCount());
   if (!dbRef) return;
   try {
     dbRef.ref('/presence').on('value', snap => {
       let n = 0;
       const now = Date.now();
+      const seen = new Set();
       snap.forEach(c => {
         const v = c.val();
-        if (v && v.ts && now - v.ts < 60000) n++;
-        else if (v && !v.ts) n++;
+        if (!v) return;
+        if (v.ts && now - v.ts > 120000) return;
+        const id = v.uid || c.key;
+        if (seen.has(id)) return;
+        seen.add(id);
+        n++;
       });
-      updateOnlineUI(n);
+      if (currentUser && !seen.has(currentUser.uid)) n += 1;
+      updateOnlineUI(Math.max(n, selfCount()));
+    }, err => {
+      console.warn('online', err);
+      updateOnlineUI(selfCount());
     });
   } catch (e) {
     console.warn('online listen', e);
-    updateOnlineUI(0);
+    updateOnlineUI(selfCount());
   }
 }
 
@@ -1763,37 +1899,44 @@ async function registerUser(login, pass) {
   login = sanitizeLogin(login);
   if (login.length < 3) throw new Error('Логин минимум 3 символа');
   if (pass.length < 4) throw new Error('Пароль минимум 4 символа');
-  if (!dbRef) {
-    // offline local register
-    const hash = await hashPass(pass);
-    const users = JSON.parse(localStorage.getItem('tetrisUsers') || '{}');
-    if (users[login]) throw new Error('Логин уже занят');
-    users[login] = { hash, created: Date.now() };
-    localStorage.setItem('tetrisUsers', JSON.stringify(users));
-    return { login, uid: 'local_' + login, guest: false, local: true };
-  }
   const hash = await hashPass(pass);
-  const userRef = dbRef.ref('/accounts/' + login);
-  const snap = await userRef.once('value');
-  if (snap.exists()) throw new Error('Логин уже занят');
-  const uid = login + '_' + Math.random().toString(36).slice(2, 8);
-  await userRef.set({ hash, uid, created: Date.now() });
-  return { login, uid, guest: false };
+  const key = login.toLowerCase();
+  const users = JSON.parse(localStorage.getItem('tetrisUsers') || '{}');
+  if (users[key]) throw new Error('Логин уже занят');
+  const uid = 'u_' + key + '_' + Math.random().toString(36).slice(2, 6);
+  users[key] = { hash, uid, login, created: Date.now() };
+  localStorage.setItem('tetrisUsers', JSON.stringify(users));
+  // try cloud (optional)
+  if (dbRef) {
+    try {
+      await dbRef.ref('/accounts/' + encodeURIComponent(key)).set({ hash, uid, login, created: Date.now() });
+    } catch (e) { console.warn('cloud register', e); }
+  }
+  return { login, uid, guest: false, local: true };
 }
 
 async function loginUser(login, pass) {
   login = sanitizeLogin(login);
   if (!login || !pass) throw new Error('Введите логин и пароль');
   const hash = await hashPass(pass);
-  if (!dbRef) {
-    const users = JSON.parse(localStorage.getItem('tetrisUsers') || '{}');
-    if (!users[login] || users[login].hash !== hash) throw new Error('Неверный логин или пароль');
-    return { login, uid: 'local_' + login, guest: false, local: true };
+  const key = login.toLowerCase();
+  const users = JSON.parse(localStorage.getItem('tetrisUsers') || '{}');
+  if (users[key] && users[key].hash === hash) {
+    return { login: users[key].login || login, uid: users[key].uid || ('local_' + key), guest: false, local: true };
   }
-  const snap = await dbRef.ref('/accounts/' + login).once('value');
-  const data = snap.val();
-  if (!data || data.hash !== hash) throw new Error('Неверный логин или пароль');
-  return { login, uid: data.uid || ('u_' + login), guest: false };
+  // try cloud
+  if (dbRef) {
+    try {
+      const snap = await dbRef.ref('/accounts/' + encodeURIComponent(key)).once('value');
+      const data = snap.val();
+      if (data && data.hash === hash) {
+        users[key] = { hash, uid: data.uid, login: data.login || login, created: data.created };
+        localStorage.setItem('tetrisUsers', JSON.stringify(users));
+        return { login: data.login || login, uid: data.uid || ('u_' + key), guest: false };
+      }
+    } catch (e) { console.warn('cloud login', e); }
+  }
+  throw new Error('Неверный логин или пароль');
 }
 
 function loginAsGuest() {
@@ -1877,8 +2020,43 @@ function openDuelLobby() {
     return;
   }
   showScreen(document.getElementById('duel-lobby-screen'));
-  setPresence('searching');
+  try { setPresence('searching'); } catch(e) {}
   refreshPlayerList();
+}
+
+function botPlayers() {
+  return [
+    { login: 'Bot_Alex', uid: 'bot_alex', status: 'online', bot: true },
+    { login: 'Bot_Mira', uid: 'bot_mira', status: 'searching', bot: true },
+    { login: 'Bot_Max', uid: 'bot_max', status: 'online', bot: true },
+    { login: 'Bot_Nina', uid: 'bot_nina', status: 'online', bot: true },
+  ];
+}
+
+function renderPlayersList(players) {
+  const list = document.getElementById('duel-players-list');
+  if (!list) return;
+  if (!players.length) {
+    list.innerHTML = '<div class="list-item"><div class="li-desc">Никого нет. Нажми быстрый поиск — будет бот.</div></div>';
+    return;
+  }
+  list.innerHTML = players.map(p => {
+    const st = p.bot ? 'бот' : p.status === 'in_game' ? 'в игре' : p.status === 'searching' ? 'ищет дуэль' : 'онлайн';
+    const busy = p.status === 'in_game' && !p.bot;
+    return `<div class="list-item">
+      <div class="li-body" style="flex:1">
+        <div class="li-name">${p.login}</div>
+        <div class="player-status ${busy ? 'busy' : ''}">${st}</div>
+      </div>
+      <button type="button" class="challenge-btn" data-uid="${p.uid}" data-name="${p.login}" data-bot="${p.bot?1:0}" ${busy ? 'disabled' : ''}>Вызвать</button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.challenge-btn').forEach(btn => {
+    btn.onclick = () => {
+      if (btn.getAttribute('data-bot') === '1') startBotDuel(btn.getAttribute('data-name'));
+      else challengePlayer(btn.getAttribute('data-uid'), btn.getAttribute('data-name'));
+    };
+  });
 }
 
 function refreshPlayerList() {
@@ -1886,8 +2064,9 @@ function refreshPlayerList() {
   if (!list) return;
   const q = (document.getElementById('duel-search')?.value || '').trim().toLowerCase();
   list.innerHTML = '<div class="list-item"><div class="li-desc">Загрузка игроков...</div></div>';
+  const bots = botPlayers().filter(p => !q || p.login.toLowerCase().includes(q));
   if (!dbRef) {
-    list.innerHTML = '<div class="list-item"><div class="li-desc">Нет сети — дуэль только онлайн</div></div>';
+    renderPlayersList(bots);
     return;
   }
   dbRef.ref('/presence').once('value').then(snap => {
@@ -1897,32 +2076,41 @@ function refreshPlayerList() {
       const v = c.val();
       if (!v || !v.login) return;
       if (currentUser && v.uid === currentUser.uid) return;
-      if (v.ts && now - v.ts > 90000) return;
+      if (v.ts && now - v.ts > 120000) return;
       if (q && !String(v.login).toLowerCase().includes(q)) return;
       players.push(v);
     });
     players.sort((a, b) => String(a.login).localeCompare(String(b.login)));
-    if (!players.length) {
-      list.innerHTML = '<div class="list-item"><div class="li-desc">Никого не найдено. Жди или быстрый поиск.</div></div>';
-      return;
+    renderPlayersList(players.concat(bots.filter(b => !players.some(p => p.login === b.login))));
+  }).catch(() => renderPlayersList(bots));
+}
+
+function startBotDuel(botName) {
+  gameMode = 'duel';
+  duelId = 'bot_' + Date.now();
+  duelOppScore = 0;
+  ensureAudio();
+  startGame();
+  showScreen(gameDiv);
+  paused = false;
+  const dc = document.getElementById('duel-card');
+  if (dc) dc.style.display = '';
+  const el = document.getElementById('duel-opp');
+  if (el) el.textContent = '0';
+  toast('⚔️ Дуэль с ' + (botName || 'ботом'));
+  // bot scores gradually
+  if (window._botTimer) clearInterval(window._botTimer);
+  const target = settings.duelTarget || 3000;
+  window._botTimer = setInterval(() => {
+    if (gameOver || gameMode !== 'duel' || paused) return;
+    duelOppScore += 40 + Math.floor(Math.random() * 80);
+    if (el) el.textContent = String(duelOppScore);
+    if (duelOppScore >= target && score < target) {
+      clearInterval(window._botTimer);
+      endGame(false);
+      toast('Поражение против бота');
     }
-    list.innerHTML = players.map(p => {
-      const st = p.status === 'in_game' ? 'в игре' : p.status === 'searching' ? 'ищет дуэль' : 'онлайн';
-      const busy = p.status === 'in_game';
-      return `<div class="list-item">
-        <div class="li-body" style="flex:1">
-          <div class="li-name">${p.login}</div>
-          <div class="player-status ${busy ? 'busy' : ''}">${st}</div>
-        </div>
-        <button type="button" class="challenge-btn" data-uid="${p.uid}" data-name="${p.login}" ${busy ? 'disabled' : ''}>Вызвать</button>
-      </div>`;
-    }).join('');
-    list.querySelectorAll('.challenge-btn').forEach(btn => {
-      btn.onclick = () => challengePlayer(btn.getAttribute('data-uid'), btn.getAttribute('data-name'));
-    });
-  }).catch(() => {
-    list.innerHTML = '<div class="list-item"><div class="li-desc">Ошибка загрузки списка</div></div>';
-  });
+  }, 1200);
 }
 
 function challengePlayer(uid, name) {
@@ -1986,7 +2174,7 @@ function startDuelWithRoom(roomId, room) {
     duelOppScore = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
     const el = document.getElementById('duel-opp');
     if (el) el.textContent = String(duelOppScore);
-    if (duelOppScore >= 3000 && score < 3000 && !gameOver) {
+    if (duelOppScore >= (settings.duelTarget || 3000) && score < (settings.duelTarget || 3000) && !gameOver) {
       endGame(false);
       toast('Поражение в дуэли');
     }
@@ -2029,12 +2217,16 @@ publishDuelScore = function() {
 };
 
 function quickMatch() {
-  if (!dbRef || !currentUser) {
-    toast('Нужен вход и сеть');
+  if (!currentUser) {
+    toast('Сначала войди');
     return;
   }
   toast('⚡ Ищем соперника...');
   setPresence('searching');
+  if (!dbRef) {
+    setTimeout(() => startBotDuel('Bot_Quick'), 800);
+    return;
+  }
   const waiting = dbRef.ref('/duelWaiting');
   waiting.once('value').then(snap => {
     let joined = false;
@@ -2050,55 +2242,49 @@ function quickMatch() {
           guestName: currentUser.login,
           guestScore: 0
         });
-        // create room mirror
         const room = {
-          host: v.host,
-          hostName: v.hostName || 'Игрок',
-          guest: currentUser.uid,
-          guestName: currentUser.login,
-          hostScore: 0,
-          guestScore: 0,
-          status: 'active',
-          target: 3000,
-          ts: Date.now()
+          host: v.host, hostName: v.hostName || 'Игрок',
+          guest: currentUser.uid, guestName: currentUser.login,
+          hostScore: 0, guestScore: 0, status: 'active',
+          target: settings.duelTarget || 3000, ts: Date.now()
         };
         dbRef.ref('/duelRooms/' + roomId).set(room);
         startDuelWithRoom(roomId, room);
       }
     });
     if (!joined) {
+      // wait 3s then bot
       const ref = waiting.push({
-        host: currentUser.uid,
-        hostName: currentUser.login,
-        hostScore: 0,
-        guestScore: 0,
-        status: 'waiting',
-        ts: Date.now()
+        host: currentUser.uid, hostName: currentUser.login,
+        hostScore: 0, guestScore: 0, status: 'waiting', ts: Date.now()
       });
       duelId = ref.key;
       toast('Ждём соперника...');
+      let found = false;
       ref.on('value', s => {
         const v = s.val();
         if (!v) return;
         if (v.status === 'active' && v.guest) {
+          found = true;
           const room = {
-            host: currentUser.uid,
-            hostName: currentUser.login,
-            guest: v.guest,
-            guestName: v.guestName || 'Игрок',
-            hostScore: 0,
-            guestScore: 0,
-            status: 'active',
-            target: 3000,
-            ts: Date.now()
+            host: currentUser.uid, hostName: currentUser.login,
+            guest: v.guest, guestName: v.guestName || 'Игрок',
+            hostScore: 0, guestScore: 0, status: 'active',
+            target: settings.duelTarget || 3000, ts: Date.now()
           };
           dbRef.ref('/duelRooms/' + ref.key).set(room);
           startDuelWithRoom(ref.key, room);
           ref.off();
         }
       });
+      setTimeout(() => {
+        if (!found && gameMode !== 'duel') {
+          try { ref.remove(); } catch(e) {}
+          startBotDuel('Bot_Quick');
+        }
+      }, 3000);
     }
-  }).catch(() => toast('Ошибка поиска'));
+  }).catch(() => startBotDuel('Bot_Quick'));
 }
 
 function bindDuelLobbyUI() {
