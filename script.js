@@ -1546,8 +1546,9 @@ function startGame() {
   if (gameMode === 'duel') {
     if (dc) dc.style.display = '';
     const el = document.getElementById('duel-opp');
-    if (el) el.textContent = '0';
-    startDuelMatchmaking();
+    if (el) el.textContent = String(duelOppScore || 0);
+    const dt = document.getElementById('duel-target-val');
+    if (dt) dt.textContent = String(settings.duelTarget || 5000);
   } else {
     if (dc) dc.style.display = 'none';
   }
@@ -1562,24 +1563,85 @@ function endGame(won) {
   paused = true;
   if (window._botTimer) { clearInterval(window._botTimer); window._botTimer = null; }
   publishDuelScore();
-  sfx('gameover');
+  sfx(won ? 'tetris' : 'gameover');
   if (score > stats.bestScore) { stats.bestScore = score; saveStats(); }
   checkAchievements();
-  if (won && gameMode === 'duel') {
-    stats.duelWins = (stats.duelWins || 0) + 1;
-    saveStats();
-    checkAchievements();
+
+  const titleEl = document.getElementById('go-title');
+  const subEl = document.getElementById('go-subtitle');
+  const duelRow = document.getElementById('go-duel-row');
+  const retryBtn = document.getElementById('go-retry');
+  const tr = document.getElementById('go-time-row');
+
+  if (gameMode === 'duel') {
+    const target = settings.duelTarget || 5000;
+    const myWin = won || score >= target;
+    const oppWin = !myWin && duelOppScore >= target;
+    // if neither hit target (topped out), higher score wins
+    let youWon = myWin;
+    if (!myWin && !oppWin) {
+      youWon = score > duelOppScore;
+    }
+    if (youWon && score >= target) youWon = true;
+    if (!youWon && duelOppScore >= target) youWon = false;
+    if (score >= target) youWon = true;
+    if (duelOppScore >= target && score < target) youWon = false;
+
+    if (youWon) {
+      stats.duelWins = (stats.duelWins || 0) + 1;
+      saveStats();
+      checkAchievements();
+      if (titleEl) titleEl.textContent = 'ПОБЕДА';
+      if (subEl) {
+        subEl.style.display = '';
+        subEl.textContent = 'Ты победил · соперник проиграл';
+      }
+    } else {
+      if (titleEl) titleEl.textContent = 'ПОРАЖЕНИЕ';
+      if (subEl) {
+        subEl.style.display = '';
+        subEl.textContent = 'Ты проиграл · соперник победил';
+      }
+    }
+    if (duelRow) {
+      duelRow.style.display = '';
+      const oppEl = document.getElementById('go-duel-opp');
+      if (oppEl) oppEl.textContent = String(duelOppScore || 0);
+    }
+    if (retryBtn) retryBtn.style.display = 'none';
+    if (tr) tr.style.display = 'none';
+    // mark room finished
+    try {
+      if (dbRef && duelId && currentUser) {
+        const myId = fbKey(currentUser.uid);
+        dbRef.ref('/duelRooms/' + duelId).update({
+          status: 'finished',
+          winner: youWon ? myId : 'opponent',
+          finalHost: null,
+          myScore: score,
+          oppScore: duelOppScore
+        });
+      }
+    } catch (e) {}
+  } else {
+    if (subEl) { subEl.style.display = 'none'; subEl.textContent = ''; }
+    if (duelRow) duelRow.style.display = 'none';
+    if (retryBtn) retryBtn.style.display = '';
+    if (won) {
+      if (titleEl) titleEl.textContent = gameMode === 'sprint' ? 'СПРИНТ ПРОЙДЕН!' : 'ПОБЕДА!';
+    } else {
+      if (titleEl) titleEl.textContent = 'GAME OVER';
+    }
+    if (gameMode === 'sprint' && tr) {
+      tr.style.display = '';
+      const gt = document.getElementById('go-time');
+      if (gt) gt.textContent = formatTime(sprintElapsed);
+    } else if (tr) tr.style.display = 'none';
   }
-  document.getElementById('go-title').textContent =
-    won ? (gameMode === 'duel' ? 'ПОБЕДА В ДУЭЛИ!' : gameMode === 'sprint' ? 'СПРИНТ ПРОЙДЕН!' : 'ПОБЕДА!') : 'GAME OVER';
+
   document.getElementById('go-score').textContent = score;
   document.getElementById('go-lines').textContent = linesCleared;
   document.getElementById('go-level').textContent = level;
-  const tr = document.getElementById('go-time-row');
-  if (gameMode === 'sprint') {
-    tr.style.display = '';
-    document.getElementById('go-time').textContent = formatTime(sprintElapsed);
-  } else tr.style.display = 'none';
   submitScore(score);
   showScreen(goScreen);
 }
@@ -2313,6 +2375,8 @@ function startDuelWithRoom(roomId, room) {
   if (dc) dc.style.display = '';
   const el = document.getElementById('duel-opp');
   if (el) el.textContent = '0';
+  const dt = document.getElementById('duel-target-val');
+  if (dt) dt.textContent = String(settings.duelTarget || 5000);
   try { setPresence('in_game'); } catch (e) {}
   toast('⚔️ Дуэль началась!');
 }

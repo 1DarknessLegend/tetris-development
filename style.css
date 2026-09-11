@@ -1554,3 +1554,16 @@ body > .profile-bar:not(.center-profile) {
   left: 50% !important;
   transform: translateX(-50%) !important;
 }
+.duel-opp-score {
+  color: #f87171 !important;
+  font-size: 18px !important;
+}
+.go-subtitle {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+#go-duel-row b {
+  color: #f87171;
+}
