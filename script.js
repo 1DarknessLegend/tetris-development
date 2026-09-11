@@ -2064,12 +2064,24 @@ function bindAuthUI() {
 
 // ===================== DUEL LOBBY =====================
 function openDuelLobby() {
+  if (!currentUser) {
+    toast('Сначала войди в аккаунт');
+    showScreen(document.getElementById('auth-screen'));
+    return;
+  }
   const sc = document.getElementById('duel-lobby-screen');
   showScreen(sc);
   if (sc) {
     sc.style.display = 'flex';
     sc.classList.add('active-screen');
   }
+  try { setPresence('searching'); } catch (e) {}
+  try {
+    const q = (document.getElementById('duel-search')?.value || '').trim().toLowerCase();
+    const bots = (typeof botPlayers === 'function' ? botPlayers() : []).filter(p => !q || p.login.toLowerCase().includes(q));
+    if (typeof renderPlayersList === 'function') renderPlayersList(bots);
+  } catch (e) { console.warn(e); }
+  if (typeof refreshPlayerList === 'function') refreshPlayerList();
 }
 
 function botPlayers() {

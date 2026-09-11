@@ -150,14 +150,19 @@
 </div>
 
 
-<!-- DUEL LOBBY (in development) -->
+<!-- DUEL LOBBY -->
 <div id="duel-lobby-screen" class="screen">
-  <div class="dev-card">
-    <div class="dev-emoji">⚔️</div>
-    <h1 class="screen-title">Дуэль</h1>
-    <p class="dev-text">В разработке</p>
-    <button type="button" id="duel-lobby-back" class="primary-btn">← Назад</button>
+  <button class="back-btn" id="duel-lobby-back">← Назад</button>
+  <h1 class="screen-title">Дуэль 1vs1</h1>
+  <div class="duel-search-wrap">
+    <input type="text" id="duel-search" placeholder="Поиск игрока по нику..." autocomplete="off" />
+    <button type="button" id="duel-refresh" class="ghost-btn">🔄</button>
   </div>
+  <div id="duel-players-list" class="list-scroll"></div>
+  <div class="duel-lobby-actions">
+    <button type="button" id="duel-quick" class="primary-btn">⚡ Быстрый поиск</button>
+  </div>
+  <div id="duel-incoming" class="duel-incoming" style="display:none"></div>
 </div>
 
 <!-- MAIN GAME -->
