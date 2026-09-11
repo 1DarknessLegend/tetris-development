@@ -1759,7 +1759,9 @@ function sanitizeLogin(login) {
 }
 
 function updateOnlineUI(n) {
-  /* online UI removed from game */
+  document.querySelectorAll('.online-count-menu').forEach(el => {
+    el.textContent = String(n);
+  });
 }
 
 function updateUserBar() {

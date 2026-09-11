@@ -1526,3 +1526,23 @@ body > .profile-bar:not(.center-profile) {
   width: auto !important;
   min-width: 120px !important;
 }
+
+.user-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 340px;
+  justify-content: flex-start;
+}
+.user-bar .menu-online {
+  flex-shrink: 0;
+  order: 0;
+}
+#user-name-display {
+  order: 1;
+  margin-left: auto;
+}
+#logout-btn {
+  order: 2;
+}
