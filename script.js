@@ -77,7 +77,7 @@ function defaultUserData() {
     balance: 0,
     bought: {},
     stats: {
-      totalLines: 0, marathonLines: 0, bestScore: 0, tetrises: 0, maxCombo: 0,
+      totalLines: 0, bestScore: 0, tetrises: 0, maxCombo: 0,
       maxLevel: 1, sprints: 0, themesBought: 0, casesOpened: 0,
       tspins: 0, hungerLines: 0, gamesPlayed: 0, duelWins: 0, unlocked: {}
     },
@@ -860,36 +860,27 @@ function saveLocalScore(entry) {
 }
 
 function submitScore(sc) {
-  // Only registered users; score & lines boards = marathon only
+  // Only marathon (classic) counts for score / lines leaderboards
+  if (gameMode !== 'classic') return;
   if (!currentUser || currentUser.guest) return;
   if (!dbRef) return;
   const name = currentUser.login;
   const uid = fbKey(currentUser.uid);
   try {
-    if (gameMode === 'classic') {
-      const ref = dbRef.ref('/scores/' + uid);
-      ref.once('value').then(s => {
-        const prev = s.val() || {};
-        const bestScore = Math.max(prev.score || 0, sc || 0, highScores.classic || 0);
-        const bestLines = Math.max(prev.lines || 0, stats.marathonLines || 0);
-        ref.set({
-          name,
-          uid,
-          score: bestScore,
-          lines: bestLines,
-          mode: 'classic',
-          registered: true,
-          ts: Date.now()
-        });
+    const ref = dbRef.ref('/scores/' + uid);
+    ref.once('value').then(s => {
+      const prev = s.val() || {};
+      const bestScore = Math.max(prev.score || 0, sc || 0);
+      const bestLines = Math.max(prev.lines || 0, linesCleared || 0);
+      ref.set({
+        name,
+        uid,
+        score: bestScore,
+        lines: bestLines,
+        mode: 'classic',
+        registered: true,
+        ts: Date.now()
       });
-    }
-    // profile level always
-    dbRef.ref('/levels/' + uid).set({
-      name,
-      uid,
-      level: profileLevel(),
-      registered: true,
-      ts: Date.now()
     });
   } catch (e) { console.warn('submitScore', e); }
 }
@@ -1027,15 +1018,12 @@ returnCaseBtn?.addEventListener('click', () => {
 function updateCaseTimer() {
   const diff = caseAvailableAt - Date.now();
   if (diff <= 0) {
-    if (timerEl) timerEl.textContent = '00:00:00';
+    if (timerEl) timerEl.textContent = '00:00';
     if (openCaseBtn) openCaseBtn.disabled = false;
   } else {
-    const totalSec = Math.floor(diff / 1000);
-    const sec = totalSec % 60;
-    const min = Math.floor(totalSec / 60) % 60;
-    const hrs = Math.floor(totalSec / 3600);
-    if (timerEl) timerEl.textContent =
-      `${String(hrs).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    const sec = Math.floor(diff / 1000) % 60;
+    const min = Math.floor(diff / 60000);
+    if (timerEl) timerEl.textContent = `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
     if (openCaseBtn) openCaseBtn.disabled = true;
     setTimeout(updateCaseTimer, 1000);
   }
@@ -1359,7 +1347,6 @@ function arenaSweep() {
     balance += gained;
     linesCleared += rowCount;
     stats.totalLines += rowCount;
-    if (gameMode === 'classic') stats.marathonLines = (stats.marathonLines || 0) + rowCount;
     if (gameMode === 'hunger') stats.hungerLines = (stats.hungerLines || 0) + rowCount;
     questProgress('lines', rowCount);
     questProgress('score', gained);
@@ -1781,15 +1768,14 @@ function endGame(won) {
     else if (duelOppScore >= target) youWon = false;
     else youWon = !!won;
 
-    let finalOpp = Math.max(
-      Number(duelOppScore) || 0,
-      Number(window._lastDuelOppScore) || 0
-    );
+    // snapshot opp score now (before async clears)
+    let finalOpp = Number(duelOppScore) || 0;
+    // also read from on-screen opponent value
     try {
       const live = document.getElementById('duel-opp');
       if (live) {
-        const n = parseInt(String(live.textContent).replace(/\D/g,''), 10);
-        if (!isNaN(n)) finalOpp = Math.max(finalOpp, n);
+        const n = parseInt(live.textContent, 10);
+        if (!isNaN(n) && n > finalOpp) finalOpp = n;
       }
     } catch(e) {}
 
@@ -1801,49 +1787,17 @@ function endGame(won) {
     } else {
       if (titleEl) titleEl.textContent = 'ПОРАЖЕНИЕ';
     }
+    // no description in duel result
     if (subEl) {
       subEl.style.display = 'none';
+      subEl.textContent = '';
       subEl.hidden = true;
     }
-    // Always show opponent score row with a number
     if (duelRow) {
       duelRow.style.display = 'flex';
-      duelRow.hidden = false;
-      duelRow.removeAttribute('hidden');
-    }
-    const oppEl0 = document.getElementById('go-duel-opp');
-    if (oppEl0) oppEl0.textContent = String(finalOpp || 0);
-    window._lastDuelOppScore = finalOpp || 0;
-    // delayed refresh from room (async scores)
-    setTimeout(() => {
       const oppEl = document.getElementById('go-duel-opp');
-      const row = document.getElementById('go-duel-row');
-      if (row) { row.style.display = 'flex'; row.hidden = false; }
-      let best = finalOpp;
-      try {
-        const live = document.getElementById('duel-opp');
-        if (live) {
-          const n = parseInt(String(live.textContent).replace(/\D/g,''), 10);
-          if (!isNaN(n)) best = Math.max(best, n);
-        }
-      } catch(e) {}
-      if (window._lastDuelOppScore) best = Math.max(best, Number(window._lastDuelOppScore)||0);
-      if (oppEl) oppEl.textContent = String(best);
-    }, 300);
-    setTimeout(() => {
-      if (!dbRef || !duelId || !currentUser) return;
-      dbRef.ref('/duelRooms/' + duelId).once('value').then(s => {
-        const v = s.val();
-        if (!v) return;
-        const myId = fbKey(currentUser.uid);
-        const isHost = String(v.host) === myId;
-        const opp = isHost ? (Number(v.guestScore)||0) : (Number(v.hostScore)||0);
-        const oppEl = document.getElementById('go-duel-opp');
-        const row = document.getElementById('go-duel-row');
-        if (row) { row.style.display = 'flex'; row.hidden = false; }
-        if (oppEl) oppEl.textContent = String(Math.max(opp, finalOpp));
-      }).catch(()=>{});
-    }, 600);
+      if (oppEl) oppEl.textContent = String(finalOpp);
+    }
     if (retryBtn) retryBtn.style.display = 'none';
     if (tr) tr.style.display = 'none';
 
@@ -1898,18 +1852,20 @@ function endGame(won) {
     } else if (tr) tr.style.display = 'none';
   }
 
-  if (gameMode !== 'duel' && subEl) {
-    subEl.style.display = 'none';
-    subEl.textContent = '';
-    subEl.hidden = true;
-  }
-  const gs = document.getElementById('go-score');
-  if (gs) gs.textContent = score;
-  // lines & level hidden on result screen
+  document.getElementById('go-score').textContent = score;
+  const gl = document.getElementById('go-lines');
+  const glev = document.getElementById('go-level');
+  if (gl) gl.textContent = linesCleared;
+  if (glev) glev.textContent = level;
   const linesRow = document.getElementById('go-lines-row');
   const levelRow = document.getElementById('go-level-row');
-  if (linesRow) linesRow.style.display = 'none';
-  if (levelRow) levelRow.style.display = 'none';
+  if (gameMode === 'duel') {
+    if (linesRow) linesRow.style.display = 'none';
+    if (levelRow) levelRow.style.display = 'none';
+  } else {
+    if (linesRow) linesRow.style.display = '';
+    if (levelRow) levelRow.style.display = '';
+  }
   submitScore(score);
   if (goScreen) {
     goScreen.classList.toggle('duel-go', gameMode === 'duel');
@@ -2763,10 +2719,8 @@ function startDuelWithRoom(roomId, room) {
       const myId = currentUser ? fbKey(currentUser.uid) : '';
       const isHost = myId && String(v.host) === myId;
       const myScoreCloud = isHost ? (v.hostScore || 0) : (v.guestScore || 0);
-      duelOppScore = isHost ? (Number(v.guestScore) || 0) : (Number(v.hostScore) || 0);
-      window._lastDuelOppScore = duelOppScore;
+      duelOppScore = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
       const el = document.getElementById('duel-opp');
-      window._lastDuelOppScore = duelOppScore;
       if (el) el.textContent = String(duelOppScore);
       const target = settings.duelTarget || 5000;
 
