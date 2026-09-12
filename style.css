@@ -1672,3 +1672,62 @@ body > .profile-bar:not(.center-profile) {
 .go-actions .ghost-btn {
   width: 100%;
 }
+
+/* eye open / crossed */
+.pass-toggle .eye-off {
+  position: relative;
+  display: inline-block;
+}
+.pass-toggle .eye-off::after {
+  content: '';
+  position: absolute;
+  left: 10%;
+  top: 45%;
+  width: 80%;
+  height: 2px;
+  background: #f87171;
+  transform: rotate(-25deg);
+  border-radius: 1px;
+}
+.pass-toggle .eye-open[hidden],
+.pass-toggle .eye-off[hidden] {
+  display: none !important;
+}
+
+/* restore normal screen title spacing */
+#achievements-screen .screen-title,
+#quests-screen .screen-title,
+#settings-screen .screen-title,
+#shop-screen .screen-title,
+#leaderboard-screen .screen-title,
+#case-screen .screen-title {
+  margin-top: 8px !important;
+  margin-bottom: 12px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.mode-footer {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+  max-width: 340px;
+  margin: 12px auto 0;
+}
+.mode-footer .menu-action-btn {
+  width: 100% !important;
+  min-height: 48px;
+  flex: none !important;
+}
+.mode-top-btn { display: none !important; }
+
+.lb-tabs {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lb-tabs .auth-tab {
+  flex: 1 1 30%;
+  font-size: 12px;
+  padding: 8px 6px;
+}
