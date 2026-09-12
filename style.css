@@ -1567,3 +1567,24 @@ body > .profile-bar:not(.center-profile) {
 #go-duel-row b {
   color: #f87171;
 }
+
+#duel-lobby-screen .list-scroll {
+  max-width: 420px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+#duel-lobby-screen .list-item {
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+#duel-lobby-screen .duel-search-wrap,
+#duel-lobby-screen .duel-lobby-actions {
+  max-width: 420px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}

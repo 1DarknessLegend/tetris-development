@@ -13,8 +13,10 @@ if (holdCtx) holdCtx.imageSmoothingEnabled = false;
 
 // ===================== STATE =====================
 let score = 0;
-let highScore = parseInt(localStorage.getItem('tetrisHighScore') || '0', 10);
-let balance = parseInt(localStorage.getItem('tetrisBalance') || '0', 10);
+let highScore = 0;
+let balance = 0;
+// seasonClaimed declared above
+// caseAvailableAt declared above
 let level = 1;
 let linesCleared = 0;
 let dropInterval = 1000;
@@ -66,6 +68,85 @@ function saveSettings() {
   localStorage.setItem('tetrisSettings', JSON.stringify(settings));
 }
 
+// ===================== CLOUD USER DATA =====================
+function defaultUserData() {
+  return {
+    highScore: 0,
+    balance: 0,
+    bought: {},
+    stats: {
+      totalLines: 0, bestScore: 0, tetrises: 0, maxCombo: 0,
+      maxLevel: 1, sprints: 0, themesBought: 0, casesOpened: 0,
+      tspins: 0, hungerLines: 0, gamesPlayed: 0, duelWins: 0, unlocked: {}
+    },
+    quests: null,
+    seasonClaimed: {},
+    caseAvailableAt: 0,
+    updatedAt: Date.now()
+  };
+}
+
+function applyUserData(data) {
+  data = data || defaultUserData();
+  highScore = data.highScore || 0;
+  balance = data.balance || 0;
+  const b = data.bought || {};
+  themes.forEach(t => { bought[t] = !!b[t]; });
+  stats = Object.assign(defaultUserData().stats, data.stats || {});
+  if (!stats.unlocked) stats.unlocked = {};
+  seasonClaimed = data.seasonClaimed || {};
+  caseAvailableAt = data.caseAvailableAt || 0;
+  // quests
+  if (data.quests && data.quests.date === todayKey() && data.quests.items) {
+    quests = data.quests;
+  } else {
+    const shuffled = QUEST_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 10);
+    quests = { date: todayKey(), ver: 2, items: shuffled.map(q => ({ ...q, progress: 0, claimed: false })) };
+  }
+  updateScore();
+  updateBalance();
+  updateProfileUI();
+  updateCaseTimer();
+  try { renderShop && renderShop(); } catch(e) {}
+}
+
+async function loadUserData(uid) {
+  if (!dbRef || !uid) {
+    applyUserData(defaultUserData());
+    return;
+  }
+  try {
+    const snap = await dbRef.ref('/userdata/' + fbKey(uid)).once('value');
+    const data = snap.val();
+    applyUserData(data || defaultUserData());
+  } catch (e) {
+    console.warn('loadUserData', e);
+    applyUserData(defaultUserData());
+  }
+}
+
+let _saveCloudTimer = null;
+function saveUserData() {
+  if (!currentUser || currentUser.guest || !dbRef) return;
+  const payload = {
+    highScore,
+    balance,
+    bought: Object.assign({}, bought),
+    stats,
+    quests,
+    seasonClaimed,
+    caseAvailableAt,
+    updatedAt: Date.now()
+  };
+  // debounce writes
+  clearTimeout(_saveCloudTimer);
+  _saveCloudTimer = setTimeout(() => {
+    dbRef.ref('/userdata/' + fbKey(currentUser.uid)).set(payload).catch(e => console.warn('saveUserData', e));
+  }, 400);
+}
+
+
+
 const SKINS = {
   classic: [null, '#FF0D72', '#0DC2FF', '#0DFF72', '#F538FF', '#FF8E0D', '#FFE138', '#3877FF'],
   neon:    [null, '#ff00aa', '#00f0ff', '#39ff14', '#bf00ff', '#ff6b00', '#ffff00', '#00a2ff'],
@@ -110,12 +191,11 @@ const ACHIEVEMENTS = [
   { id: 'duel_win', name: 'Дуэлянт', desc: 'Выиграй дуэль', check: s => (s.duelWins || 0) >= 1 },
 ];
 
-let stats = JSON.parse(localStorage.getItem('tetrisStats') || '{}');
-stats = Object.assign({
+let stats = {
   totalLines: 0, bestScore: 0, tetrises: 0, maxCombo: 0,
   maxLevel: 1, sprints: 0, themesBought: 0, casesOpened: 0,
-  tspins: 0, hungerLines: 0, unlocked: {}
-}, stats);
+  tspins: 0, hungerLines: 0, gamesPlayed: 0, duelWins: 0, unlocked: {}
+};
 
 function profileLevel() {
   return Math.floor((stats.totalLines || 0) / 25) + 1;
@@ -135,7 +215,7 @@ function updateProfileUI() {
 }
 
 function saveStats() {
-  localStorage.setItem('tetrisStats', JSON.stringify(stats));
+  saveUserData();
 }
 
 function checkAchievements() {
@@ -183,16 +263,11 @@ const QUEST_POOL = [
   { id: 'q_hold', name: 'Используй удержание 5 раз', target: 5, key: 'hold', reward: 350 },
 ];
 
-let quests = JSON.parse(localStorage.getItem('tetrisQuests') || 'null');
-if (!quests || quests.date !== todayKey() || !quests.items || quests.items.length !== 10 || quests.ver !== 2) {
-  const shuffled = QUEST_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 10);
-  quests = {
-    date: todayKey(),
-    ver: 2,
-    items: shuffled.map(q => ({ ...q, progress: 0, claimed: false }))
-  };
-  localStorage.setItem('tetrisQuests', JSON.stringify(quests));
-}
+let quests = {
+  date: todayKey(),
+  ver: 2,
+  items: QUEST_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 10).map(q => ({ ...q, progress: 0, claimed: false }))
+};
 
 function questProgress(key, amount) {
   let changed = false;
@@ -206,7 +281,7 @@ function questProgress(key, amount) {
       }
     }
   });
-  if (changed) localStorage.setItem('tetrisQuests', JSON.stringify(quests));
+  if (changed) saveUserData();
 }
 
 function renderQuests() {
@@ -233,7 +308,7 @@ function renderQuests() {
       q.claimed = true;
       balance += q.reward;
       updateBalance();
-      localStorage.setItem('tetrisQuests', JSON.stringify(quests));
+      saveUserData();
       toast('💎 +' + q.reward);
       renderQuests();
       sfx('coin');
@@ -387,8 +462,8 @@ function updateScore() {
   if (cc) cc.style.display = combo > 1 ? '' : 'none';
   if (score > highScore) {
     highScore = score;
-    localStorage.setItem('tetrisHighScore', highScore);
     if (hv) hv.textContent = highScore;
+    saveUserData();
   }
   if (gameMode === 'duel') {
     publishDuelScore();
@@ -416,7 +491,7 @@ function updateBalance() {
 }
 
 function saveBought() {
-  localStorage.setItem('tetrisBought', JSON.stringify(bought));
+  saveUserData();
 }
 
 // ===================== SHOP BUY =====================
@@ -609,7 +684,6 @@ const SEASON_REWARDS = [
   { level: 20, reward: 2500, label: '2500 💎 Легенда' },
 ];
 let seasonClaimed = {};
-try { seasonClaimed = JSON.parse(localStorage.getItem('tetrisSeason') || '{}') || {}; } catch(e) { seasonClaimed = {}; }
 
 function renderSeason() {
   const list = document.getElementById('season-list');
@@ -635,7 +709,7 @@ function renderSeason() {
       const r = SEASON_REWARDS.find(x => x.level === lv);
       if (!r || seasonClaimed[lv] || profileLevel() < lv) return;
       seasonClaimed[lv] = true;
-      localStorage.setItem('tetrisSeason', JSON.stringify(seasonClaimed));
+      saveUserData();
       balance += r.reward;
       updateBalance();
       toast('🎟️ Сезон: +' + r.reward + ' 💎');
@@ -844,7 +918,7 @@ const caseScreen = document.getElementById('case-screen');
 const returnCaseBtn = document.getElementById('return-case');
 const timerEl = document.getElementById('timer');
 const openCaseBtn = document.getElementById('open-case');
-let caseAvailableAt = parseInt(localStorage.getItem('tetrisCaseAt') || '0', 10) || (Date.now() + 5 * 60 * 1000);
+let caseAvailableAt = 0;
 const rewards = [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000];
 
 caseBtn?.addEventListener('click', () => {
@@ -933,7 +1007,7 @@ openCaseBtn?.addEventListener('click', () => {
       saveStats();
       checkAchievements();
       caseAvailableAt = Date.now() + 5 * 60 * 1000;
-      localStorage.setItem('tetrisCaseAt', caseAvailableAt);
+      saveUserData();
       updateCaseTimer();
     };
     scroll.addEventListener('transitionend', handleTransitionEnd);
@@ -1587,13 +1661,21 @@ function endGame(won) {
 
   if (gameMode === 'duel') {
     const target = settings.duelTarget || 5000;
-    let youWon = !!won;
-    if (score >= target) youWon = true;
-    else if (duelOppScore >= target) youWon = false;
-    else if (!won) youWon = false; // topped out = lose unless opp already lost
-    else youWon = score >= duelOppScore;
+    let youWon = false;
+    let bothLose = false;
+    if (score >= target) {
+      youWon = true;
+    } else if (duelOppScore >= target) {
+      youWon = false;
+    } else if (!won) {
+      // stack top-out → both lose
+      bothLose = true;
+      youWon = false;
+    } else {
+      youWon = score > duelOppScore;
+    }
 
-    if (youWon) {
+    if (youWon && !bothLose) {
       stats.duelWins = (stats.duelWins || 0) + 1;
       saveStats();
       checkAchievements();
@@ -1601,6 +1683,12 @@ function endGame(won) {
       if (subEl) {
         subEl.style.display = '';
         subEl.textContent = 'Ты победил · соперник проиграл';
+      }
+    } else if (bothLose) {
+      if (titleEl) titleEl.textContent = 'ПОРАЖЕНИЕ';
+      if (subEl) {
+        subEl.style.display = '';
+        subEl.textContent = 'Оба проиграли · завал поля';
       }
     } else {
       if (titleEl) titleEl.textContent = 'ПОРАЖЕНИЕ';
@@ -1626,7 +1714,8 @@ function endGame(won) {
           const isHost = String(v.host) === myId;
           ref.update({
             status: 'finished',
-            winner: youWon ? myId : (isHost ? v.guest : v.host),
+            winner: bothLose ? 'none' : (youWon ? myId : (isHost ? v.guest : v.host)),
+            bothLose: !!bothLose,
             hostScore: isHost ? score : (v.hostScore || duelOppScore),
             guestScore: isHost ? (v.guestScore || duelOppScore) : score,
             ts: Date.now()
@@ -2001,74 +2090,47 @@ async function registerUser(login, pass) {
   login = sanitizeLogin(login);
   if (login.length < 3) throw new Error('Логин минимум 3 символа');
   if (pass.length < 4) throw new Error('Пароль минимум 4 символа');
+  if (!dbRef) throw new Error('Нужен интернет для регистрации');
   const hash = await hashPass(pass);
   const key = login.toLowerCase();
   const uid = 'u_' + fbKey(key);
-
-  // Cloud is source of truth when available
-  if (dbRef) {
-    const userRef = dbRef.ref('/accounts/' + fbKey(key));
-    const snap = await userRef.once('value');
-    if (snap.exists()) throw new Error('Логин уже занят');
-    await userRef.set({ hash, uid, login, created: Date.now() });
-  } else {
-    const users = JSON.parse(localStorage.getItem('tetrisUsers') || '{}');
-    if (users[key]) throw new Error('Логин уже занят');
-  }
-  // local cache
-  const users = JSON.parse(localStorage.getItem('tetrisUsers') || '{}');
-  users[key] = { hash, uid, login, created: Date.now() };
-  localStorage.setItem('tetrisUsers', JSON.stringify(users));
+  const userRef = dbRef.ref('/accounts/' + fbKey(key));
+  const snap = await userRef.once('value');
+  if (snap.exists()) throw new Error('Логин уже занят');
+  await userRef.set({ hash, uid, login, created: Date.now() });
+  // empty cloud profile
+  await dbRef.ref('/userdata/' + fbKey(uid)).set({
+    highScore: 0, balance: 0, bought: {}, stats: {
+      totalLines: 0, bestScore: 0, tetrises: 0, maxCombo: 0,
+      maxLevel: 1, sprints: 0, themesBought: 0, casesOpened: 0,
+      tspins: 0, gamesPlayed: 0, duelWins: 0, unlocked: {}
+    }, quests: null, seasonClaimed: {}, caseAvailableAt: 0, updatedAt: Date.now()
+  });
   return { login, uid, guest: false };
 }
 
 async function loginUser(login, pass) {
   login = sanitizeLogin(login);
   if (!login || !pass) throw new Error('Введите логин и пароль');
+  if (!dbRef) throw new Error('Нужен интернет для входа');
   const hash = await hashPass(pass);
   const key = login.toLowerCase();
-  let user = null;
+  const snap = await dbRef.ref('/accounts/' + fbKey(key)).once('value');
+  const data = snap.val();
+  if (!data) throw new Error('Аккаунт не зарегистрирован');
+  if (data.hash !== hash) throw new Error('Неверный логин или пароль');
+  const user = { login: data.login || login, uid: data.uid || ('u_' + fbKey(key)), guest: false };
 
-  if (dbRef) {
-    try {
-      const snap = await dbRef.ref('/accounts/' + fbKey(key)).once('value');
-      const data = snap.val();
-      if (data && data.hash === hash) {
-        user = { login: data.login || login, uid: data.uid || ('u_' + fbKey(key)), guest: false };
-        const users = JSON.parse(localStorage.getItem('tetrisUsers') || '{}');
-        users[key] = { hash, uid: user.uid, login: user.login, created: data.created || Date.now() };
-        localStorage.setItem('tetrisUsers', JSON.stringify(users));
-      } else if (data) {
-        throw new Error('Неверный логин или пароль');
-      }
-    } catch (e) {
-      if (e.message === 'Неверный логин или пароль') throw e;
-      console.warn('cloud login', e);
-    }
+  const deviceId = getDeviceId();
+  const sessRef = dbRef.ref('/sessions/' + fbKey(user.uid));
+  const sess = await sessRef.once('value');
+  const s = sess.val();
+  const now = Date.now();
+  if (s && s.deviceId && s.deviceId !== deviceId && s.ts && now - s.ts < 120000) {
+    throw new Error('Аккаунт уже используется на другом устройстве');
   }
-
-  if (!user) {
-    const users = JSON.parse(localStorage.getItem('tetrisUsers') || '{}');
-    if (users[key] && users[key].hash === hash) {
-      user = { login: users[key].login || login, uid: users[key].uid || ('local_' + key), guest: false, local: true };
-    }
-  }
-
-  if (!user) throw new Error('Неверный логин или пароль');
-
-  // Single-device session
-  if (dbRef && !user.guest) {
-    const deviceId = getDeviceId();
-    const sessRef = dbRef.ref('/sessions/' + fbKey(user.uid));
-    const sess = await sessRef.once('value');
-    const s = sess.val();
-    const now = Date.now();
-    if (s && s.deviceId && s.deviceId !== deviceId && s.ts && now - s.ts < 120000) {
-      throw new Error('Аккаунт уже используется на другом устройстве');
-    }
-    await sessRef.set({ deviceId, login: user.login, ts: now });
-    sessRef.onDisconnect().remove();
-  }
+  await sessRef.set({ deviceId, login: user.login, ts: now });
+  sessRef.onDisconnect().remove();
   return user;
 }
 
@@ -2105,11 +2167,16 @@ function loginAsGuest() {
   return { login: 'Гость_' + id.slice(0, 4), uid: 'guest_' + id, guest: true };
 }
 
-function onLoggedIn(user) {
+async function onLoggedIn(user) {
   currentUser = user;
-  localStorage.setItem('tetrisSession', JSON.stringify(user));
+  localStorage.setItem('tetrisSession', JSON.stringify({ login: user.login, uid: user.uid, guest: !!user.guest }));
   localStorage.setItem('tetrisName', user.login);
   updateUserBar();
+  if (user.guest) {
+    applyUserData(defaultUserData());
+  } else {
+    await loadUserData(user.uid);
+  }
   try { startPresence(); } catch (e) {}
   try { listenInvites(); } catch (e) {}
   try { listenOnlineCount(); } catch (e) {}
@@ -2443,8 +2510,20 @@ function startDuelWithRoom(roomId, room) {
 
       // Opponent finished the duel for both
       if (v.status === 'finished') {
-        const iWon = v.winner === myId;
-        endGame(iWon);
+        if (v.bothLose || v.winner === 'none') {
+          // force both-lose UI
+          duelOppScore = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
+          endGame(false);
+          // override subtitle after endGame
+          setTimeout(() => {
+            const t = document.getElementById('go-title');
+            const s = document.getElementById('go-subtitle');
+            if (t) t.textContent = 'ПОРАЖЕНИЕ';
+            if (s) { s.style.display = ''; s.textContent = 'Оба проиграли · завал поля'; }
+          }, 50);
+        } else {
+          endGame(v.winner === myId);
+        }
         return;
       }
 
@@ -2517,74 +2596,31 @@ function quickMatch() {
     toast('Нужна сеть для дуэли');
     return;
   }
-  toast('⚡ Ищем соперника...');
+  if (currentUser.guest) {
+    toast('Для дуэли нужна регистрация');
+    return;
+  }
+  toast('⚡ Ищем случайного игрока...');
   setPresence('searching');
   const myId = fbKey(currentUser.uid);
-  const waiting = dbRef.ref('/duelWaiting');
-  waiting.once('value').then(snap => {
-    let joined = false;
-    snap.forEach(child => {
-      if (joined) return;
-      const v = child.val();
-      if (v && v.status === 'waiting' && String(v.host) !== myId) {
-        joined = true;
-        const roomId = child.key;
-        const room = {
-          host: v.host,
-          hostName: v.hostName || 'Игрок',
-          guest: myId,
-          guestName: currentUser.login,
-          hostScore: 0,
-          guestScore: 0,
-          status: 'active',
-          target: settings.duelTarget || 5000,
-          ts: Date.now()
-        };
-        child.ref.update({ status: 'active', guest: myId, guestName: currentUser.login }).then(() => {
-          return dbRef.ref('/duelRooms/' + roomId).set(room);
-        }).then(() => startDuelWithRoom(roomId, room));
-      }
+  dbRef.ref('/presence').once('value').then(snap => {
+    const players = [];
+    const now = Date.now();
+    snap.forEach(c => {
+      const v = c.val();
+      if (!v || !v.login) return;
+      const id = fbKey(v.uid || c.key);
+      if (id === myId) return;
+      if (v.ts && now - v.ts > 45000) return;
+      if (v.status === 'in_game') return;
+      players.push({ login: v.login, uid: id });
     });
-    if (!joined) {
-      const ref = waiting.push({
-        host: myId,
-        hostName: currentUser.login,
-        hostScore: 0,
-        guestScore: 0,
-        status: 'waiting',
-        ts: Date.now()
-      });
-      toast('Ждём соперника...');
-      const handler = s => {
-        const v = s.val();
-        if (!v) return;
-        if (v.status === 'active' && v.guest) {
-          ref.off('value', handler);
-          const roomId = ref.key;
-          const room = {
-            host: myId,
-            hostName: currentUser.login,
-            guest: v.guest,
-            guestName: v.guestName || 'Игрок',
-            hostScore: 0,
-            guestScore: 0,
-            status: 'active',
-            target: settings.duelTarget || 5000,
-            ts: Date.now()
-          };
-          dbRef.ref('/duelRooms/' + roomId).set(room).then(() => startDuelWithRoom(roomId, room));
-        }
-      };
-      ref.on('value', handler);
-      setTimeout(() => {
-        try { ref.off('value', handler); } catch(e) {}
-        try {
-          ref.once('value').then(s => {
-            if (s.val() && s.val().status === 'waiting') ref.remove();
-          });
-        } catch(e) {}
-      }, 60000);
+    if (!players.length) {
+      toast('Нет свободных игроков онлайн');
+      return;
     }
+    const pick = players[Math.floor(Math.random() * players.length)];
+    challengePlayer(pick.uid, pick.login);
   }).catch(() => toast('Ошибка поиска'));
 }
 
@@ -2635,13 +2671,17 @@ try {
 // restore session
 try {
   const sess = JSON.parse(localStorage.getItem('tetrisSession') || 'null');
-  if (sess && sess.login && sess.uid) {
+  if (sess && sess.login && sess.uid && !sess.guest) {
     currentUser = sess;
     updateUserBar();
-    startPresence();
-    listenInvites();
-    showScreen(modeScreen);
+    loadUserData(sess.uid).then(() => {
+      startPresence();
+      listenInvites();
+      watchSessionKick();
+      showScreen(modeScreen);
+    });
   } else {
+    localStorage.removeItem('tetrisSession');
     showScreen(document.getElementById('auth-screen'));
   }
 } catch (e) {
