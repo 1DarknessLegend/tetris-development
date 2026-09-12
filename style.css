@@ -1765,3 +1765,35 @@ body > .profile-bar:not(.center-profile) {
 .pass-toggle {
   z-index: 3;
 }
+
+.mode-top-btn { display: none !important; }
+.mode-footer {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  max-width: 340px;
+  margin: 12px auto 0;
+}
+.mode-footer .menu-action-btn {
+  width: 100% !important;
+  min-height: 48px;
+  justify-content: center;
+}
+
+/* restore normal title spacing */
+#achievements-screen .screen-title,
+#quests-screen .screen-title,
+#settings-screen .screen-title,
+#shop-screen .screen-title,
+#leaderboard-screen .screen-title,
+#case-screen .screen-title {
+  margin-top: 12px !important;
+  margin-bottom: 12px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+#go-subtitle { display: none !important; }
+#gameover-screen.duel-go #go-duel-row { display: flex !important; }
+#gameover-screen:not(.duel-go) #go-duel-row { display: none !important; }

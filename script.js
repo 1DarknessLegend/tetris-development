@@ -918,58 +918,69 @@ function renderLeaderboard() {
   const list = document.getElementById('leaderboard-list');
   if (!list) return;
   list.innerHTML = '<div class="list-item"><div class="li-desc">Загрузка...</div></div>';
-  saveLocalLevel();
+  try { saveLocalLevel(); } catch(e) {}
 
   if (!dbRef) {
     list.innerHTML = '<div class="list-item"><div class="li-desc">Нужен интернет для топа</div></div>';
     return;
   }
 
-  if (lbTab === 'level') {
-    dbRef.ref('/levels').limitToLast(50).once('value').then(snap => {
-      const rows = [];
+  // only registered accounts
+  dbRef.ref('/accounts').once('value').then(accSnap => {
+    const registeredNames = new Set();
+    const registeredUids = new Set();
+    accSnap.forEach(c => {
+      const v = c.val();
+      if (!v) return;
+      if (v.login) registeredNames.add(String(v.login).toLowerCase());
+      if (v.uid) registeredUids.add(fbKey(v.uid));
+      registeredUids.add(fbKey(c.key));
+    });
+
+    const isReg = (row) => {
+      if (!row) return false;
+      if (row.registered === false) return false;
+      const uid = fbKey(row.uid || '');
+      const name = String(row.name || '').toLowerCase();
+      if (uid && registeredUids.has(uid)) return true;
+      if (name && registeredNames.has(name)) return true;
+      return false;
+    };
+
+    if (lbTab === 'level') {
+      return dbRef.ref('/levels').once('value').then(snap => {
+        const map = {};
+        snap.forEach(c => {
+          const v = c.val();
+          if (!v || !isReg(v)) return;
+          if (String(v.uid || '').startsWith('guest')) return;
+          const k = fbKey(v.uid || v.name);
+          if (!map[k] || (v.level||0) > (map[k].level||0)) map[k] = v;
+        });
+        const uniq = Object.values(map).sort((a,b) => (b.level||0) - (a.level||0));
+        renderLeaderboardRows(uniq, list, 'level', 'профиль');
+      });
+    }
+
+    // score / lines — marathon only (written only from classic)
+    return dbRef.ref('/scores').once('value').then(snap => {
+      const map = {};
       snap.forEach(c => {
         const v = c.val();
-        if (!v || !v.name || !v.registered) return;
+        if (!v || !isReg(v)) return;
+        if (v.mode && v.mode !== 'classic') return;
         if (String(v.uid || '').startsWith('guest')) return;
-        rows.push(v);
+        const k = fbKey(v.uid || v.name);
+        if (!map[k]) map[k] = Object.assign({}, v);
+        else {
+          map[k].score = Math.max(map[k].score||0, v.score||0);
+          map[k].lines = Math.max(map[k].lines||0, v.lines||0);
+        }
       });
-      // unique by uid/name keep best level
-      const map = {};
-      rows.forEach(r => {
-        const k = r.uid || r.name;
-        if (!map[k] || (r.level||0) > (map[k].level||0)) map[k] = r;
-      });
-      const uniq = Object.values(map).sort((a,b) => (b.level||0) - (a.level||0));
-      renderLeaderboardRows(uniq, list, 'level', 'профиль');
-    }).catch(() => {
-      list.innerHTML = '<div class="list-item"><div class="li-desc">Ошибка загрузки</div></div>';
+      const key = lbTab === 'lines' ? 'lines' : 'score';
+      const uniq = Object.values(map).sort((a,b) => (b[key]||0) - (a[key]||0));
+      renderLeaderboardRows(uniq, list, key, 'марафон');
     });
-    return;
-  }
-
-  // score or lines — from /scores, marathon only
-  dbRef.ref('/scores').limitToLast(50).once('value').then(snap => {
-    const rows = [];
-    snap.forEach(c => {
-      const v = c.val();
-      if (!v || !v.name || !v.registered) return;
-      if (v.mode && v.mode !== 'classic') return;
-      if (String(v.uid || '').startsWith('guest')) return;
-      rows.push(v);
-    });
-    const map = {};
-    rows.forEach(r => {
-      const k = r.uid || r.name;
-      if (!map[k]) map[k] = r;
-      else {
-        map[k].score = Math.max(map[k].score||0, r.score||0);
-        map[k].lines = Math.max(map[k].lines||0, r.lines||0);
-      }
-    });
-    const key = lbTab === 'lines' ? 'lines' : 'score';
-    const uniq = Object.values(map).sort((a,b) => (b[key]||0) - (a[key]||0));
-    renderLeaderboardRows(uniq, list, key, 'марафон');
   }).catch(() => {
     list.innerHTML = '<div class="list-item"><div class="li-desc">Ошибка загрузки</div></div>';
   });
@@ -1755,7 +1766,18 @@ function endGame(won) {
     let youWon = false;
     if (score >= target) youWon = true;
     else if (duelOppScore >= target) youWon = false;
-    else youWon = !!won; // top-out: caller passes false for loser
+    else youWon = !!won;
+
+    // snapshot opp score now (before async clears)
+    let finalOpp = Number(duelOppScore) || 0;
+    // also read from on-screen opponent value
+    try {
+      const live = document.getElementById('duel-opp');
+      if (live) {
+        const n = parseInt(live.textContent, 10);
+        if (!isNaN(n) && n > finalOpp) finalOpp = n;
+      }
+    } catch(e) {}
 
     if (youWon) {
       stats.duelWins = (stats.duelWins || 0) + 1;
@@ -1765,49 +1787,53 @@ function endGame(won) {
     } else {
       if (titleEl) titleEl.textContent = 'ПОРАЖЕНИЕ';
     }
+    // no description in duel result
     if (subEl) {
       subEl.style.display = 'none';
       subEl.textContent = '';
+      subEl.hidden = true;
     }
     if (duelRow) {
       duelRow.style.display = 'flex';
       const oppEl = document.getElementById('go-duel-opp');
-      const showOpp = () => {
-        if (oppEl) oppEl.textContent = String(duelOppScore || 0);
-      };
-      showOpp();
-      // refresh from room if still 0
-      if ((!duelOppScore || duelOppScore === 0) && dbRef && duelId) {
-        try {
-          dbRef.ref('/duelRooms/' + duelId).once('value').then(s => {
-            const v = s.val();
-            if (!v || !currentUser) return;
-            const myId = fbKey(currentUser.uid);
-            const isHost = String(v.host) === myId;
-            duelOppScore = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
-            showOpp();
-          });
-        } catch(e) {}
-      }
+      if (oppEl) oppEl.textContent = String(finalOpp);
     }
     if (retryBtn) retryBtn.style.display = 'none';
     if (tr) tr.style.display = 'none';
+
+    const applyOppFromRoom = (v) => {
+      if (!v || !currentUser) return;
+      const myId = fbKey(currentUser.uid);
+      const isHost = String(v.host) === myId;
+      const opp = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
+      if (opp > finalOpp) finalOpp = opp;
+      duelOppScore = finalOpp;
+      const oppEl = document.getElementById('go-duel-opp');
+      if (oppEl) oppEl.textContent = String(finalOpp);
+    };
+
     try {
       if (dbRef && duelId && currentUser) {
         const myId = fbKey(currentUser.uid);
         const ref = dbRef.ref('/duelRooms/' + duelId);
+        // publish my final score then read opp
         ref.once('value').then(s => {
           const v = s.val() || {};
-          if (v.status === 'finished') return;
           const isHost = String(v.host) === myId;
-          ref.update({
+          const patch = {
             status: 'finished',
             winner: youWon ? myId : (isHost ? v.guest : v.host),
-            hostScore: isHost ? score : (v.hostScore || duelOppScore),
-            guestScore: isHost ? (v.guestScore || duelOppScore) : score,
             ts: Date.now()
-          });
-        });
+          };
+          if (isHost) patch.hostScore = score;
+          else patch.guestScore = score;
+          // keep best known opp score in room
+          if (isHost) patch.guestScore = Math.max(v.guestScore || 0, finalOpp);
+          else patch.hostScore = Math.max(v.hostScore || 0, finalOpp);
+          return ref.update(patch).then(() => ref.once('value'));
+        }).then(s2 => {
+          if (s2) applyOppFromRoom(s2.val());
+        }).catch(() => {});
       }
     } catch (e) {}
   } else {
@@ -1841,6 +1867,9 @@ function endGame(won) {
     if (levelRow) levelRow.style.display = '';
   }
   submitScore(score);
+  if (goScreen) {
+    goScreen.classList.toggle('duel-go', gameMode === 'duel');
+  }
   showScreen(goScreen);
 }
 
@@ -2299,6 +2328,7 @@ async function onLoggedIn(user) {
   try { listenInvites(); } catch (e) {}
   try { listenOnlineCount(); } catch (e) {}
   try { watchSessionKick(); } catch (e) {}
+  try { saveLocalLevel(); } catch (e) {}
   showScreen(modeScreen);
   // ensure visible on mobile
   const ms = document.getElementById('mode-screen');
