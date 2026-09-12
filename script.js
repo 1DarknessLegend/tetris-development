@@ -72,6 +72,7 @@ function saveSettings() {
 function defaultUserData() {
   return {
     highScore: 0,
+    highScores: { classic: 0, sprint: 0, duel: 0 },
     balance: 0,
     bought: {},
     stats: {
@@ -86,9 +87,46 @@ function defaultUserData() {
   };
 }
 
+let highScores = { classic: 0, sprint: 0, duel: 0 };
+
+function modeRecordKey(mode) {
+  if (mode === 'sprint') return 'sprint';
+  if (mode === 'duel') return 'duel';
+  return 'classic';
+}
+
+function getModeHigh(mode) {
+  const k = modeRecordKey(mode || gameMode);
+  return (highScores && highScores[k]) || 0;
+}
+
+function setModeHigh(mode, value) {
+  const k = modeRecordKey(mode || gameMode);
+  if (!highScores) highScores = { classic: 0, sprint: 0, duel: 0 };
+  highScores[k] = value;
+  if (k === 'classic') highScore = value; // legacy field
+}
+
 function applyUserData(data) {
+  // hard reset first so previous account never leaks
+  highScore = 0;
+  highScores = { classic: 0, sprint: 0, duel: 0 };
+  balance = 0;
+  themes.forEach(t => { bought[t] = false; active[t] = false; });
+  stats = defaultUserData().stats;
+  seasonClaimed = {};
+  caseAvailableAt = 0;
+  quests = {
+    date: todayKey(),
+    ver: 2,
+    items: QUEST_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 10).map(q => ({ ...q, progress: 0, claimed: false }))
+  };
+
   data = data || defaultUserData();
-  highScore = data.highScore || 0;
+  highScores = Object.assign({ classic: 0, sprint: 0, duel: 0 }, data.highScores || {});
+  // migrate old single highScore
+  if (data.highScore && !highScores.classic) highScores.classic = data.highScore;
+  highScore = highScores.classic || 0;
   balance = data.balance || 0;
   const b = data.bought || {};
   themes.forEach(t => { bought[t] = !!b[t]; });
@@ -96,12 +134,8 @@ function applyUserData(data) {
   if (!stats.unlocked) stats.unlocked = {};
   seasonClaimed = data.seasonClaimed || {};
   caseAvailableAt = data.caseAvailableAt || 0;
-  // quests
   if (data.quests && data.quests.date === todayKey() && data.quests.items) {
     quests = data.quests;
-  } else {
-    const shuffled = QUEST_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 10);
-    quests = { date: todayKey(), ver: 2, items: shuffled.map(q => ({ ...q, progress: 0, claimed: false })) };
   }
   updateScore();
   updateBalance();
@@ -129,7 +163,8 @@ let _saveCloudTimer = null;
 function saveUserData() {
   if (!currentUser || currentUser.guest || !dbRef) return;
   const payload = {
-    highScore,
+    highScore: highScores.classic || highScore || 0,
+    highScores: Object.assign({ classic: 0, sprint: 0, duel: 0 }, highScores),
     balance,
     bought: Object.assign({}, bought),
     stats,
@@ -375,7 +410,7 @@ function vibrate(ms) {
 }
 
 // ===================== TOAST =====================
-function toast(msg) {
+function toast(msg, opts) {
   let el = document.getElementById('toast');
   if (!el) {
     el = document.createElement('div');
@@ -385,7 +420,22 @@ function toast(msg) {
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 2200);
+  if (opts && opts.sticky) {
+    el._sticky = true;
+    return el;
+  }
+  el._sticky = false;
+  el._t = setTimeout(() => {
+    if (!el._sticky) el.classList.remove('show');
+  }, (opts && opts.ms) || 2200);
+  return el;
+}
+function clearStickyToast() {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el._sticky = false;
+  clearTimeout(el._t);
+  el.classList.remove('show');
 }
 
 // ===================== DOM =====================
@@ -1448,7 +1498,25 @@ function addGarbage(n) {
   // if player collides after garbage, push up or end
   if (player.matrix && collide(arena, player)) {
     player.pos.y--;
-    if (collide(arena, player)) endGame(false);
+    if (collide(arena, player)) {
+      if (gameMode === 'duel' && dbRef && duelId && currentUser) {
+        try {
+          const myId = fbKey(currentUser.uid);
+          dbRef.ref('/duelRooms/' + duelId).once('value').then(s => {
+            const v = s.val() || {};
+            const isHost = String(v.host) === myId;
+            dbRef.ref('/duelRooms/' + duelId).update({
+              status: 'finished',
+              winner: isHost ? v.guest : v.host,
+              hostScore: isHost ? score : (v.hostScore || 0),
+              guestScore: isHost ? (v.guestScore || 0) : score,
+              ts: Date.now()
+            });
+          });
+        } catch(e) {}
+      }
+      endGame(false);
+    }
   }
 }
 
@@ -1662,20 +1730,11 @@ function endGame(won) {
   if (gameMode === 'duel') {
     const target = settings.duelTarget || 5000;
     let youWon = false;
-    let bothLose = false;
-    if (score >= target) {
-      youWon = true;
-    } else if (duelOppScore >= target) {
-      youWon = false;
-    } else if (!won) {
-      // stack top-out → both lose
-      bothLose = true;
-      youWon = false;
-    } else {
-      youWon = score > duelOppScore;
-    }
+    if (score >= target) youWon = true;
+    else if (duelOppScore >= target) youWon = false;
+    else youWon = !!won; // top-out: caller passes false for loser
 
-    if (youWon && !bothLose) {
+    if (youWon) {
       stats.duelWins = (stats.duelWins || 0) + 1;
       saveStats();
       checkAchievements();
@@ -1683,12 +1742,6 @@ function endGame(won) {
       if (subEl) {
         subEl.style.display = '';
         subEl.textContent = 'Ты победил · соперник проиграл';
-      }
-    } else if (bothLose) {
-      if (titleEl) titleEl.textContent = 'ПОРАЖЕНИЕ';
-      if (subEl) {
-        subEl.style.display = '';
-        subEl.textContent = 'Оба проиграли · завал поля';
       }
     } else {
       if (titleEl) titleEl.textContent = 'ПОРАЖЕНИЕ';
@@ -1714,8 +1767,7 @@ function endGame(won) {
           const isHost = String(v.host) === myId;
           ref.update({
             status: 'finished',
-            winner: bothLose ? 'none' : (youWon ? myId : (isHost ? v.guest : v.host)),
-            bothLose: !!bothLose,
+            winner: youWon ? myId : (isHost ? v.guest : v.host),
             hostScore: isHost ? score : (v.hostScore || duelOppScore),
             guestScore: isHost ? (v.guestScore || duelOppScore) : score,
             ts: Date.now()
@@ -1982,27 +2034,47 @@ function startPresence() {
 }
 
 // leave immediately on tab close / hide / refresh
+function forceLogoutSession(reason) {
+  try { clearPresenceNow(); } catch(e) {}
+  try {
+    if (dbRef && currentUser && !currentUser.guest) {
+      dbRef.ref('/sessions/' + fbKey(currentUser.uid)).remove();
+    }
+  } catch(e) {}
+  if (window._sessionUnsub) { try { window._sessionUnsub(); } catch(e) {} }
+  if (window._sessionBeat) clearInterval(window._sessionBeat);
+  if (inviteUnsub) { try { inviteUnsub(); } catch(e) {} }
+  currentUser = null;
+  localStorage.removeItem('tetrisSession');
+  applyUserData(defaultUserData());
+  updateUserBar();
+  updateOnlineUI(0);
+  clearStickyToast();
+  // leave game
+  paused = true;
+  gameOver = true;
+  showScreen(document.getElementById('auth-screen'));
+}
+
 function bindPresenceUnload() {
   if (window._presenceUnloadBound) return;
   window._presenceUnloadBound = true;
   const leave = () => {
     try {
       if (presenceRef) {
-        // synchronous-ish remove on unload
         presenceRef.onDisconnect().cancel();
         presenceRef.remove();
       }
     } catch (e) {}
+    // require re-login after close / refresh
+    try { localStorage.removeItem('tetrisSession'); } catch(e) {}
   };
   window.addEventListener('pagehide', leave);
   window.addEventListener('beforeunload', leave);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
-      // mark leaving quickly; full remove on pagehide
-      try { if (presenceRef) presenceRef.remove(); } catch (e) {}
-    } else if (document.visibilityState === 'visible' && currentUser && dbRef) {
-      // came back — restore presence
-      startPresence();
+      // switching tab / minimizing → logout
+      if (currentUser) forceLogoutSession('hidden');
     }
   });
 }
@@ -2198,6 +2270,8 @@ async function onLoggedIn(user) {
 }
 
 function logout() {
+  clearStickyToast();
+  window._quickSearching = false;
   clearPresenceNow();
   if (inviteUnsub) { try { inviteUnsub(); } catch(e) {} }
   if (window._sessionUnsub) { try { window._sessionUnsub(); } catch(e) {} }
@@ -2510,20 +2584,8 @@ function startDuelWithRoom(roomId, room) {
 
       // Opponent finished the duel for both
       if (v.status === 'finished') {
-        if (v.bothLose || v.winner === 'none') {
-          // force both-lose UI
-          duelOppScore = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
-          endGame(false);
-          // override subtitle after endGame
-          setTimeout(() => {
-            const t = document.getElementById('go-title');
-            const s = document.getElementById('go-subtitle');
-            if (t) t.textContent = 'ПОРАЖЕНИЕ';
-            if (s) { s.style.display = ''; s.textContent = 'Оба проиграли · завал поля'; }
-          }, 50);
-        } else {
-          endGame(v.winner === myId);
-        }
+        duelOppScore = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
+        endGame(String(v.winner) === String(myId));
         return;
       }
 
@@ -2600,28 +2662,102 @@ function quickMatch() {
     toast('Для дуэли нужна регистрация');
     return;
   }
-  toast('⚡ Ищем случайного игрока...');
+  if (window._quickSearching) return;
+  window._quickSearching = true;
+  toast('⚡ Ищем игрока...', { sticky: true });
   setPresence('searching');
   const myId = fbKey(currentUser.uid);
-  dbRef.ref('/presence').once('value').then(snap => {
-    const players = [];
-    const now = Date.now();
-    snap.forEach(c => {
-      const v = c.val();
-      if (!v || !v.login) return;
-      const id = fbKey(v.uid || c.key);
-      if (id === myId) return;
-      if (v.ts && now - v.ts > 45000) return;
-      if (v.status === 'in_game') return;
-      players.push({ login: v.login, uid: id });
-    });
-    if (!players.length) {
-      toast('Нет свободных игроков онлайн');
-      return;
+  const waiting = dbRef.ref('/duelWaiting');
+
+  const cleanupWait = (ref) => {
+    try { if (ref) ref.remove(); } catch(e) {}
+    if (window._quickHandler && ref) {
+      try { ref.off('value', window._quickHandler); } catch(e) {}
+      window._quickHandler = null;
     }
-    const pick = players[Math.floor(Math.random() * players.length)];
-    challengePlayer(pick.uid, pick.login);
-  }).catch(() => toast('Ошибка поиска'));
+  };
+
+  waiting.once('value').then(snap => {
+    let joined = false;
+    snap.forEach(child => {
+      if (joined) return;
+      const v = child.val();
+      if (v && v.status === 'waiting' && String(v.host) !== myId) {
+        joined = true;
+        const roomId = child.key;
+        const room = {
+          host: v.host,
+          hostName: v.hostName || 'Игрок',
+          guest: myId,
+          guestName: currentUser.login,
+          hostScore: 0,
+          guestScore: 0,
+          status: 'active',
+          target: settings.duelTarget || 5000,
+          ts: Date.now()
+        };
+        child.ref.update({ status: 'matched', guest: myId, guestName: currentUser.login }).then(() => {
+          return dbRef.ref('/duelRooms/' + roomId).set(room);
+        }).then(() => {
+          window._quickSearching = false;
+          clearStickyToast();
+          toast('Соперник найден!');
+          startDuelWithRoom(roomId, room);
+        });
+      }
+    });
+    if (!joined) {
+      const ref = waiting.push({
+        host: myId,
+        hostName: currentUser.login,
+        status: 'waiting',
+        ts: Date.now()
+      });
+      const handler = s => {
+        const v = s.val();
+        if (!v) return;
+        if ((v.status === 'matched' || v.status === 'active') && v.guest) {
+          ref.off('value', handler);
+          window._quickHandler = null;
+          const roomId = ref.key;
+          const room = {
+            host: myId,
+            hostName: currentUser.login,
+            guest: v.guest,
+            guestName: v.guestName || 'Игрок',
+            hostScore: 0,
+            guestScore: 0,
+            status: 'active',
+            target: settings.duelTarget || 5000,
+            ts: Date.now()
+          };
+          dbRef.ref('/duelRooms/' + roomId).set(room).then(() => {
+            try { ref.remove(); } catch(e) {}
+            window._quickSearching = false;
+            clearStickyToast();
+            toast('Соперник найден!');
+            startDuelWithRoom(roomId, room);
+          });
+        }
+      };
+      window._quickHandler = handler;
+      ref.on('value', handler);
+      // keep sticky toast until match; cancel after 2 min
+      setTimeout(() => {
+        if (window._quickSearching) {
+          window._quickSearching = false;
+          cleanupWait(ref);
+          clearStickyToast();
+          toast('Никого не найдено');
+          setPresence('online');
+        }
+      }, 120000);
+    }
+  }).catch(() => {
+    window._quickSearching = false;
+    clearStickyToast();
+    toast('Ошибка поиска');
+  });
 }
 
 function bindDuelLobbyUI() {
@@ -2671,19 +2807,11 @@ try {
 // restore session
 try {
   const sess = JSON.parse(localStorage.getItem('tetrisSession') || 'null');
-  if (sess && sess.login && sess.uid && !sess.guest) {
-    currentUser = sess;
-    updateUserBar();
-    loadUserData(sess.uid).then(() => {
-      startPresence();
-      listenInvites();
-      watchSessionKick();
-      showScreen(modeScreen);
-    });
-  } else {
-    localStorage.removeItem('tetrisSession');
-    showScreen(document.getElementById('auth-screen'));
-  }
+  // always require login after open / refresh
+  localStorage.removeItem('tetrisSession');
+  currentUser = null;
+  applyUserData(defaultUserData());
+  showScreen(document.getElementById('auth-screen'));
 } catch (e) {
   showScreen(document.getElementById('auth-screen'));
 }
