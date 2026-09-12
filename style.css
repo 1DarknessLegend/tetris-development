@@ -1628,20 +1628,12 @@ body > .profile-bar:not(.center-profile) {
   box-sizing: border-box;
 }
 
-/* equal title padding on secondary screens */
-#achievements-screen .screen-title,
-#quests-screen .screen-title,
-#settings-screen .screen-title,
-#shop-screen .screen-title,
-#leaderboard-screen .screen-title,
-#case-screen .screen-title {
-  margin-top: 16px !important;
-  margin-bottom: 16px !important;
-  padding-top: 8px;
-  padding-bottom: 8px;
+/* titles: original spacing restored */
+.screen-title {
+  margin-top: 0;
+  margin-bottom: 12px;
 }
 
-/* go stats full width like share */
 .go-stats {
   display: flex;
   flex-direction: column;
@@ -1659,8 +1651,12 @@ body > .profile-bar:not(.center-profile) {
   border-radius: 12px;
   border: 1px solid var(--border);
 }
-.go-stat-wide {
-  width: 100% !important;
+#go-duel-row {
+  display: none;
+}
+#go-duel-row[style*="flex"],
+.go-card #go-duel-row {
+  /* shown via inline style from JS */
 }
 .go-actions {
   display: flex;
@@ -1672,6 +1668,22 @@ body > .profile-bar:not(.center-profile) {
 .go-actions .ghost-btn {
   width: 100%;
 }
+
+/* top sits in footer group; don't stretch specially */
+.mode-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  max-width: 340px;
+  margin: 12px auto 0;
+}
+.mode-footer .menu-action-btn {
+  flex: 1 1 45%;
+  min-height: 48px;
+}
+.mode-top-btn { /* legacy standalone ignored */ }
+
 
 /* eye open / crossed */
 .pass-toggle .eye-off {
