@@ -15,6 +15,7 @@ if (holdCtx) holdCtx.imageSmoothingEnabled = false;
 let score = 0;
 let highScore = 0;
 let balance = 0;
+try { localStorage.removeItem('tetrisSession'); } catch(e) {} // BOOT_CLEAR_SESSION
 // seasonClaimed declared above
 // caseAvailableAt declared above
 let level = 1;
@@ -505,14 +506,15 @@ function updateScore() {
   const cv = document.getElementById('combo-val');
   const cc = document.getElementById('combo-card');
   if (sv) sv.textContent = score;
-  if (hv) hv.textContent = highScore;
+  const modeHi = getModeHigh(gameMode);
+  if (hv) hv.textContent = modeHi;
   if (lv) lv.textContent = level;
   if (ln) ln.textContent = linesCleared;
   if (cv) cv.textContent = 'x' + combo;
   if (cc) cc.style.display = combo > 1 ? '' : 'none';
-  if (score > highScore) {
-    highScore = score;
-    if (hv) hv.textContent = highScore;
+  if (score > modeHi) {
+    setModeHigh(gameMode, score);
+    if (hv) hv.textContent = score;
     saveUserData();
   }
   if (gameMode === 'duel') {
@@ -733,7 +735,7 @@ const SEASON_REWARDS = [
   { level: 15, reward: 1500, label: '1500 💎' },
   { level: 20, reward: 2500, label: '2500 💎 Легенда' },
 ];
-let seasonClaimed = {};
+// seasonClaimed global above
 
 function renderSeason() {
   const list = document.getElementById('season-list');
@@ -777,6 +779,7 @@ document.getElementById('season-back')?.addEventListener('click', () => showScre
 function bindSettings() {
   const map = [
     ['set-sound', 'sound', 'checked'],
+    ['set-vibrate', 'vibrate', 'checked'],
     ['set-ghost', 'ghost', 'checked'],
     ['set-grid', 'grid', 'checked'],
     ['set-particles', 'particles', 'checked'],
