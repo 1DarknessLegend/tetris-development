@@ -45,6 +45,14 @@ let presenceRef = null;
 let dbRef = null;
 let firebaseReady = false;
 let inviteUnsub = null;
+function getDeviceId() {
+  let id = localStorage.getItem('tetrisDeviceId');
+  if (!id) {
+    id = 'd_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem('tetrisDeviceId', id);
+  }
+  return id;
+}
 function fbKey(s) {
   return String(s || 'x').replace(/[.#$\[\]\/]/g, '_');
 }
@@ -385,8 +393,18 @@ function updateScore() {
   if (gameMode === 'duel') {
     publishDuelScore();
     if (score >= (settings.duelTarget || 5000) && !gameOver) {
+      // finish for both via room status
+      try {
+        if (dbRef && duelId && currentUser) {
+          const myId = fbKey(currentUser.uid);
+          dbRef.ref('/duelRooms/' + duelId).update({
+            status: 'finished',
+            winner: myId,
+            hostScore: null // filled in endGame
+          });
+        }
+      } catch(e) {}
       endGame(true);
-      toast('⚔️ Победа в дуэли!');
     }
   }
 }
@@ -500,6 +518,10 @@ document.getElementById('return')?.addEventListener('click', () => {
   paused = false;
 });
 document.getElementById('menu-btn')?.addEventListener('click', () => {
+  if (gameMode === 'duel' && !gameOver) {
+    toast('В дуэли нельзя выйти в меню');
+    return;
+  }
   paused = true;
   showScreen(modeScreen);
 });
@@ -653,17 +675,6 @@ function bindSettings() {
       }
       saveSettings();
     });
-  });
-  document.getElementById('set-reset-stats')?.addEventListener('click', () => {
-    if (!confirm('Сбросить статистику, рекорды, очки, темы, достижения и квесты?')) return;
-    const keys = [
-      'tetrisStats', 'tetrisQuests', 'tetrisSeason', 'tetrisLocalScores',
-      'tetrisLocalLevels', 'tetrisHighScore', 'tetrisBalance', 'tetrisBought',
-      'tetrisCaseAt', 'tetrisUsers', 'tetrisSession', 'tetrisName',
-      'tetrisSettings', 'tetrisDuelId'
-    ];
-    keys.forEach(k => localStorage.removeItem(k));
-    location.reload();
   });
   colors = SKINS[settings.skin] || SKINS.classic;
 }
@@ -1502,17 +1513,17 @@ function listenDuel() {
 }
 
 function publishDuelScore() {
-  if (gameMode !== 'duel' || !duelId || typeof firebase === 'undefined') return;
+  if (gameMode !== 'duel' || !duelId || !dbRef || !currentUser) return;
   try {
-    const myId = localStorage.getItem('tetrisDuelId');
-    const ref = firebase.database().ref('/duelWaiting/' + duelId);
-    ref.once('value', s => {
+    const myId = fbKey(currentUser.uid);
+    const ref = dbRef.ref('/duelRooms/' + duelId);
+    ref.once('value').then(s => {
       const v = s.val();
       if (!v) return;
-      if (v.host === myId) ref.update({ hostScore: score });
-      else ref.update({ guestScore: score });
+      if (String(v.host) === myId) ref.update({ hostScore: score, ts: Date.now() });
+      else if (String(v.guest) === myId) ref.update({ guestScore: score, ts: Date.now() });
     });
-  } catch(e) {}
+  } catch(e) { console.warn('publishDuel', e); }
 }
 
 function startGame() {
@@ -1525,7 +1536,8 @@ function startGame() {
   hungerTimer = 0; hungerInterval = 12000;
   lastRotateWasKick = false;
   lineFlashRows = []; lineFlashTime = 0;
-  stopDuel();
+  // do not clear active duel room mid-start
+  if (!(gameMode === 'duel' && duelId)) stopDuel();
   player.next = randomPiece();
   player.matrix = null;
   playerReset();
@@ -1575,17 +1587,11 @@ function endGame(won) {
 
   if (gameMode === 'duel') {
     const target = settings.duelTarget || 5000;
-    const myWin = won || score >= target;
-    const oppWin = !myWin && duelOppScore >= target;
-    // if neither hit target (topped out), higher score wins
-    let youWon = myWin;
-    if (!myWin && !oppWin) {
-      youWon = score > duelOppScore;
-    }
-    if (youWon && score >= target) youWon = true;
-    if (!youWon && duelOppScore >= target) youWon = false;
+    let youWon = !!won;
     if (score >= target) youWon = true;
-    if (duelOppScore >= target && score < target) youWon = false;
+    else if (duelOppScore >= target) youWon = false;
+    else if (!won) youWon = false; // topped out = lose unless opp already lost
+    else youWon = score >= duelOppScore;
 
     if (youWon) {
       stats.duelWins = (stats.duelWins || 0) + 1;
@@ -1610,16 +1616,21 @@ function endGame(won) {
     }
     if (retryBtn) retryBtn.style.display = 'none';
     if (tr) tr.style.display = 'none';
-    // mark room finished
     try {
       if (dbRef && duelId && currentUser) {
         const myId = fbKey(currentUser.uid);
-        dbRef.ref('/duelRooms/' + duelId).update({
-          status: 'finished',
-          winner: youWon ? myId : 'opponent',
-          finalHost: null,
-          myScore: score,
-          oppScore: duelOppScore
+        const ref = dbRef.ref('/duelRooms/' + duelId);
+        ref.once('value').then(s => {
+          const v = s.val() || {};
+          if (v.status === 'finished') return;
+          const isHost = String(v.host) === myId;
+          ref.update({
+            status: 'finished',
+            winner: youWon ? myId : (isHost ? v.guest : v.host),
+            hostScore: isHost ? score : (v.hostScore || duelOppScore),
+            guestScore: isHost ? (v.guestScore || duelOppScore) : score,
+            ts: Date.now()
+          });
         });
       }
     } catch (e) {}
@@ -1738,6 +1749,10 @@ function update(time = 0) {
 document.getElementById('hard-drop')?.addEventListener('click', () => playerHardDrop());
 document.getElementById('hold-btn')?.addEventListener('click', () => playerHold());
 document.getElementById('pause-btn')?.addEventListener('click', () => {
+  if (gameMode === 'duel') {
+    toast('В дуэли пауза недоступна');
+    return;
+  }
   if (!gameOver && gameDiv.style.display !== 'none') paused = !paused;
 });
 
@@ -1988,18 +2003,23 @@ async function registerUser(login, pass) {
   if (pass.length < 4) throw new Error('Пароль минимум 4 символа');
   const hash = await hashPass(pass);
   const key = login.toLowerCase();
+  const uid = 'u_' + fbKey(key);
+
+  // Cloud is source of truth when available
+  if (dbRef) {
+    const userRef = dbRef.ref('/accounts/' + fbKey(key));
+    const snap = await userRef.once('value');
+    if (snap.exists()) throw new Error('Логин уже занят');
+    await userRef.set({ hash, uid, login, created: Date.now() });
+  } else {
+    const users = JSON.parse(localStorage.getItem('tetrisUsers') || '{}');
+    if (users[key]) throw new Error('Логин уже занят');
+  }
+  // local cache
   const users = JSON.parse(localStorage.getItem('tetrisUsers') || '{}');
-  if (users[key]) throw new Error('Логин уже занят');
-  const uid = 'u_' + key + '_' + Math.random().toString(36).slice(2, 6);
   users[key] = { hash, uid, login, created: Date.now() };
   localStorage.setItem('tetrisUsers', JSON.stringify(users));
-  // try cloud (optional)
-  if (dbRef) {
-    try {
-      await dbRef.ref('/accounts/' + encodeURIComponent(key)).set({ hash, uid, login, created: Date.now() });
-    } catch (e) { console.warn('cloud register', e); }
-  }
-  return { login, uid, guest: false, local: true };
+  return { login, uid, guest: false };
 }
 
 async function loginUser(login, pass) {
@@ -2007,23 +2027,77 @@ async function loginUser(login, pass) {
   if (!login || !pass) throw new Error('Введите логин и пароль');
   const hash = await hashPass(pass);
   const key = login.toLowerCase();
-  const users = JSON.parse(localStorage.getItem('tetrisUsers') || '{}');
-  if (users[key] && users[key].hash === hash) {
-    return { login: users[key].login || login, uid: users[key].uid || ('local_' + key), guest: false, local: true };
-  }
-  // try cloud
+  let user = null;
+
   if (dbRef) {
     try {
-      const snap = await dbRef.ref('/accounts/' + encodeURIComponent(key)).once('value');
+      const snap = await dbRef.ref('/accounts/' + fbKey(key)).once('value');
       const data = snap.val();
       if (data && data.hash === hash) {
-        users[key] = { hash, uid: data.uid, login: data.login || login, created: data.created };
+        user = { login: data.login || login, uid: data.uid || ('u_' + fbKey(key)), guest: false };
+        const users = JSON.parse(localStorage.getItem('tetrisUsers') || '{}');
+        users[key] = { hash, uid: user.uid, login: user.login, created: data.created || Date.now() };
         localStorage.setItem('tetrisUsers', JSON.stringify(users));
-        return { login: data.login || login, uid: data.uid || ('u_' + key), guest: false };
+      } else if (data) {
+        throw new Error('Неверный логин или пароль');
       }
-    } catch (e) { console.warn('cloud login', e); }
+    } catch (e) {
+      if (e.message === 'Неверный логин или пароль') throw e;
+      console.warn('cloud login', e);
+    }
   }
-  throw new Error('Неверный логин или пароль');
+
+  if (!user) {
+    const users = JSON.parse(localStorage.getItem('tetrisUsers') || '{}');
+    if (users[key] && users[key].hash === hash) {
+      user = { login: users[key].login || login, uid: users[key].uid || ('local_' + key), guest: false, local: true };
+    }
+  }
+
+  if (!user) throw new Error('Неверный логин или пароль');
+
+  // Single-device session
+  if (dbRef && !user.guest) {
+    const deviceId = getDeviceId();
+    const sessRef = dbRef.ref('/sessions/' + fbKey(user.uid));
+    const sess = await sessRef.once('value');
+    const s = sess.val();
+    const now = Date.now();
+    if (s && s.deviceId && s.deviceId !== deviceId && s.ts && now - s.ts < 120000) {
+      throw new Error('Аккаунт уже используется на другом устройстве');
+    }
+    await sessRef.set({ deviceId, login: user.login, ts: now });
+    sessRef.onDisconnect().remove();
+  }
+  return user;
+}
+
+function watchSessionKick() {
+  if (!dbRef || !currentUser || currentUser.guest) return;
+  try {
+    if (window._sessionUnsub) { try { window._sessionUnsub(); } catch(e) {} }
+    const deviceId = getDeviceId();
+    const ref = dbRef.ref('/sessions/' + fbKey(currentUser.uid));
+    const handler = s => {
+      const v = s.val();
+      if (!v) return;
+      if (v.deviceId && v.deviceId !== deviceId) {
+        toast('Вход с другого устройства — сессия завершена');
+        logout();
+      } else if (v.deviceId === deviceId) {
+        // heartbeat session
+        ref.update({ ts: Date.now() });
+      }
+    };
+    ref.on('value', handler);
+    window._sessionUnsub = () => ref.off('value', handler);
+    if (window._sessionBeat) clearInterval(window._sessionBeat);
+    window._sessionBeat = setInterval(() => {
+      if (currentUser && dbRef) {
+        dbRef.ref('/sessions/' + fbKey(currentUser.uid)).update({ ts: Date.now(), deviceId: getDeviceId() });
+      }
+    }, 30000);
+  } catch (e) {}
 }
 
 function loginAsGuest() {
@@ -2039,6 +2113,7 @@ function onLoggedIn(user) {
   try { startPresence(); } catch (e) {}
   try { listenInvites(); } catch (e) {}
   try { listenOnlineCount(); } catch (e) {}
+  try { watchSessionKick(); } catch (e) {}
   showScreen(modeScreen);
   // ensure visible on mobile
   const ms = document.getElementById('mode-screen');
@@ -2058,6 +2133,13 @@ function onLoggedIn(user) {
 function logout() {
   clearPresenceNow();
   if (inviteUnsub) { try { inviteUnsub(); } catch(e) {} }
+  if (window._sessionUnsub) { try { window._sessionUnsub(); } catch(e) {} }
+  if (window._sessionBeat) clearInterval(window._sessionBeat);
+  try {
+    if (dbRef && currentUser && !currentUser.guest) {
+      dbRef.ref('/sessions/' + fbKey(currentUser.uid)).remove();
+    }
+  } catch(e) {}
   currentUser = null;
   localStorage.removeItem('tetrisSession');
   updateUserBar();
@@ -2351,13 +2433,32 @@ function startDuelWithRoom(roomId, room) {
       if (!v) return;
       const myId = currentUser ? fbKey(currentUser.uid) : '';
       const isHost = myId && String(v.host) === myId;
+      const myScoreCloud = isHost ? (v.hostScore || 0) : (v.guestScore || 0);
       duelOppScore = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
       const el = document.getElementById('duel-opp');
       if (el) el.textContent = String(duelOppScore);
       const target = settings.duelTarget || 5000;
-      if (duelOppScore >= target && score < target && !gameOver) {
+
+      if (gameOver) return;
+
+      // Opponent finished the duel for both
+      if (v.status === 'finished') {
+        const iWon = v.winner === myId;
+        endGame(iWon);
+        return;
+      }
+
+      // Opponent reached target first
+      if (duelOppScore >= target && score < target) {
+        try {
+          ref.update({
+            status: 'finished',
+            winner: isHost ? v.guest : v.host,
+            hostScore: isHost ? score : duelOppScore,
+            guestScore: isHost ? duelOppScore : score
+          });
+        } catch(e) {}
         endGame(false);
-        toast('Поражение в дуэли');
       }
     };
     ref.on('value', handler);
