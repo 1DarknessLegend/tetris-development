@@ -188,12 +188,12 @@
   <div class="game-layout">
     <aside class="side-panel">
       <div class="stat-card">
-        <span class="stat-label">Рекорд</span>
-        <span class="stat-value dim" id="high-val">0</span>
-      </div>
-      <div class="stat-card">
         <span class="stat-label">Счёт</span>
         <span class="stat-value" id="score-val">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Рекорд</span>
+        <span class="stat-value dim" id="high-val">0</span>
       </div>
       <div class="stat-row">
         <div class="stat-card mini">
@@ -264,11 +264,11 @@
   <div class="go-card">
     <div class="go-title" id="go-title">GAME OVER</div>
     <p class="go-subtitle" id="go-subtitle" hidden style="display:none !important"></p>
-    <div class="go-stats">
+    <div class="go-stats go-stats-compact">
       <div class="go-stat-wide"><span>Счёт</span><b id="go-score">0</b></div>
       <div class="go-stat-wide" id="go-duel-row" style="display:none"><span>Соперник</span><b id="go-duel-opp">0</b></div>
-      <div id="go-lines-row"><span>Линии</span><b id="go-lines">0</b></div>
-      <div id="go-level-row"><span>Уровень</span><b id="go-level">1</b></div>
+      <div id="go-lines-row" style="display:none"><span>Линии</span><b id="go-lines">0</b></div>
+      <div id="go-level-row" style="display:none"><span>Уровень</span><b id="go-level">1</b></div>
       <div id="go-time-row" style="display:none"><span>Время</span><b id="go-time">0:00</b></div>
     </div>
     <div class="go-actions">

@@ -1809,3 +1809,43 @@ body > .profile-bar:not(.center-profile) {
 #go-subtitle { display: none !important; }
 #gameover-screen.duel-go #go-duel-row { display: flex !important; }
 #gameover-screen:not(.duel-go) #go-duel-row { display: none !important; }
+
+.go-stats-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+.go-stat-wide {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  background: var(--surface2, rgba(255,255,255,0.04));
+  border: 1px solid var(--border, rgba(139,92,246,0.25));
+  border-radius: 12px;
+}
+.go-stat-wide span {
+  color: var(--text-dim, #94a3b8);
+  font-size: 13px;
+}
+.go-stat-wide b {
+  font-size: 18px;
+  color: #fff;
+}
+#go-duel-row.go-stat-wide b {
+  color: #f87171;
+}
+.go-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+.go-actions .primary-btn,
+.go-actions .ghost-btn {
+  width: 100%;
+  box-sizing: border-box;
+}

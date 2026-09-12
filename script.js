@@ -1031,12 +1031,15 @@ returnCaseBtn?.addEventListener('click', () => {
 function updateCaseTimer() {
   const diff = caseAvailableAt - Date.now();
   if (diff <= 0) {
-    if (timerEl) timerEl.textContent = '00:00';
+    if (timerEl) timerEl.textContent = '00:00:00';
     if (openCaseBtn) openCaseBtn.disabled = false;
   } else {
-    const sec = Math.floor(diff / 1000) % 60;
-    const min = Math.floor(diff / 60000);
-    if (timerEl) timerEl.textContent = `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    const totalSec = Math.floor(diff / 1000);
+    const sec = totalSec % 60;
+    const min = Math.floor(totalSec / 60) % 60;
+    const hrs = Math.floor(totalSec / 3600);
+    if (timerEl) timerEl.textContent =
+      `${String(hrs).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
     if (openCaseBtn) openCaseBtn.disabled = true;
     setTimeout(updateCaseTimer, 1000);
   }
@@ -1901,21 +1904,18 @@ function endGame(won) {
     } else if (tr) tr.style.display = 'none';
   }
 
-  if (subEl) { subEl.style.display = 'none'; subEl.textContent = ''; subEl.hidden = true; }
-  document.getElementById('go-score').textContent = score;
-  const gl = document.getElementById('go-lines');
-  const glev = document.getElementById('go-level');
-  if (gl) gl.textContent = linesCleared;
-  if (glev) glev.textContent = level;
+  if (gameMode !== 'duel' && subEl) {
+    subEl.style.display = 'none';
+    subEl.textContent = '';
+    subEl.hidden = true;
+  }
+  const gs = document.getElementById('go-score');
+  if (gs) gs.textContent = score;
+  // lines & level hidden on result screen
   const linesRow = document.getElementById('go-lines-row');
   const levelRow = document.getElementById('go-level-row');
-  if (gameMode === 'duel') {
-    if (linesRow) linesRow.style.display = 'none';
-    if (levelRow) levelRow.style.display = 'none';
-  } else {
-    if (linesRow) linesRow.style.display = '';
-    if (levelRow) levelRow.style.display = '';
-  }
+  if (linesRow) linesRow.style.display = 'none';
+  if (levelRow) levelRow.style.display = 'none';
   submitScore(score);
   if (goScreen) {
     goScreen.classList.toggle('duel-go', gameMode === 'duel');
