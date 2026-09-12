@@ -1731,37 +1731,3 @@ body > .profile-bar:not(.center-profile) {
   font-size: 12px;
   padding: 8px 6px;
 }
-
-#auth-screen, #auth-screen.active-screen {
-  z-index: 100 !important;
-  pointer-events: auto !important;
-  opacity: 1 !important;
-}
-.auth-card, #auth-form, #auth-form input, #auth-form button {
-  pointer-events: auto !important;
-}
-#auth-form input:disabled {
-  opacity: 0.5;
-}
-
-#auth-screen {
-  z-index: 200 !important;
-  pointer-events: auto !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-#auth-screen.active-screen {
-  display: flex !important;
-  pointer-events: auto !important;
-}
-.auth-card, .auth-tabs, .auth-tab, #auth-form, #auth-form * {
-  pointer-events: auto !important;
-}
-.auth-tab {
-  cursor: pointer;
-  z-index: 2;
-  position: relative;
-}
-.pass-toggle {
-  z-index: 3;
-}
