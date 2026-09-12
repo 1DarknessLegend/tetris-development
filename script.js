@@ -113,24 +113,15 @@ function applyUserData(data) {
   highScore = 0;
   highScores = { classic: 0, sprint: 0, duel: 0 };
   balance = 0;
-  try {
-    if (typeof themes !== 'undefined' && themes) {
-      themes.forEach(t => { bought[t] = false; if (typeof active !== 'undefined') active[t] = false; });
-    }
-  } catch (e) {}
+  themes.forEach(t => { bought[t] = false; active[t] = false; });
   stats = defaultUserData().stats;
   seasonClaimed = {};
   caseAvailableAt = 0;
-  try {
-    const pool = (typeof QUEST_POOL !== 'undefined' && QUEST_POOL) ? QUEST_POOL : [];
-    quests = {
-      date: todayKey(),
-      ver: 2,
-      items: pool.slice().sort(() => Math.random() - 0.5).slice(0, 10).map(q => ({ ...q, progress: 0, claimed: false }))
-    };
-  } catch (e) {
-    quests = { date: todayKey(), ver: 2, items: [] };
-  }
+  quests = {
+    date: todayKey(),
+    ver: 2,
+    items: QUEST_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 10).map(q => ({ ...q, progress: 0, claimed: false }))
+  };
 
   data = data || defaultUserData();
   highScores = Object.assign({ classic: 0, sprint: 0, duel: 0 }, data.highScores || {});
@@ -139,11 +130,7 @@ function applyUserData(data) {
   highScore = highScores.classic || 0;
   balance = data.balance || 0;
   const b = data.bought || {};
-  try {
-    if (typeof themes !== 'undefined' && themes) {
-      themes.forEach(t => { bought[t] = !!b[t]; });
-    }
-  } catch (e) {}
+  themes.forEach(t => { bought[t] = !!b[t]; });
   stats = Object.assign(defaultUserData().stats, data.stats || {});
   if (!stats.unlocked) stats.unlocked = {};
   seasonClaimed = data.seasonClaimed || {};
@@ -860,153 +847,134 @@ function saveLocalScore(entry) {
 }
 
 function submitScore(sc) {
-  // Marathon feeds score board; any mode feeds total lines via stats
-  if (!currentUser || currentUser.guest) return;
-  if (!dbRef) return;
-  const name = currentUser.login;
-  const uid = fbKey(currentUser.uid);
+  if (!sc || sc <= 0) return;
+  const entry = { name: getPlayerName(), score: sc, mode: gameMode, ts: Date.now() };
+  saveLocalScore(entry);
   try {
-    const ref = dbRef.ref('/scores/' + uid);
-    ref.once('value').then(s => {
-      const prev = s.val() || {};
-      const bestScore = gameMode === 'classic'
-        ? Math.max(prev.score || 0, sc || 0)
-        : (prev.score || 0);
-      const bestLines = Math.max(
-        prev.lines || 0,
-        linesCleared || 0,
-        stats.totalLines || 0
-      );
-      ref.set({
-        name,
-        uid,
-        score: bestScore,
-        lines: bestLines,
-        mode: 'classic',
-        registered: true,
-        ts: Date.now()
-      });
-    });
-    // profile level board
-    dbRef.ref('/levels/' + uid).set({
-      name,
-      uid,
-      level: profileLevel(),
-      registered: true,
-      ts: Date.now()
-    });
-  } catch (e) { console.warn('submitScore', e); }
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+      firebase.database().ref('/scores').push(entry);
+    }
+  } catch (e) { console.warn('submitScore firebase', e); }
+}
+
+function renderLeaderboardRows(rows, list, source) {
+  if (!rows.length) {
+    list.innerHTML = '<div class="list-item"><div class="li-desc">Пока пусто — сыграй партию!</div></div>';
+    return;
+  }
+  list.innerHTML = rows.slice(0, 20).map((r, i) =>
+    `<div class="list-item"><div class="li-icon">${i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1)}</div>
+    <div class="li-body"><div class="li-name">${r.name||'?'}</div>
+    <div class="li-desc">${r.score} · ${r.mode||''}</div></div></div>`
+  ).join('') + `<div class="list-item"><div class="li-desc" style="text-align:center;width:100%">Источник: ${source}</div></div>`;
+}
+
+let lbTab = 'score';
+
+function getLocalLevels() {
+  try { return JSON.parse(localStorage.getItem('tetrisLocalLevels') || '[]') || []; }
+  catch(e) { return []; }
 }
 
 function saveLocalLevel() {
-  if (!currentUser || currentUser.guest || !dbRef) return;
-  const name = currentUser.login;
-  const uid = fbKey(currentUser.uid);
+  if (!currentUser) return;
+  const name = settings.nickname || currentUser.login || getPlayerName();
   const level = profileLevel();
-  try {
-    dbRef.ref('/levels/' + uid).set({
-      name, uid, level, lines: stats.totalLines || 0, registered: true, ts: Date.now()
-    });
-  } catch(e) {}
-}
-
-function renderLeaderboardRows(rows, list, valueKey, source) {
-  if (!list) return;
-  if (!rows.length) {
-    list.innerHTML = '<div class="list-item"><div class="li-desc">Пока пусто — сыграй марафон!</div></div>';
-    return;
+  let rows = getLocalLevels().filter(r => r.name !== name);
+  rows.push({ name, level, lines: stats.totalLines || 0, ts: Date.now() });
+  rows.sort((a,b) => (b.level||0) - (a.level||0) || (b.lines||0) - (a.lines||0));
+  rows = rows.slice(0, 30);
+  localStorage.setItem('tetrisLocalLevels', JSON.stringify(rows));
+  if (dbRef) {
+    try {
+      dbRef.ref('/levels/' + encodeURIComponent(name)).set({ name, level, lines: stats.totalLines || 0, ts: Date.now() });
+    } catch(e) {}
   }
-  list.innerHTML = rows.slice(0, 30).map((r, i) => {
-    const val = r[valueKey];
-    const sub = valueKey === 'level' ? ('ур. ' + val) : (valueKey === 'lines' ? (val + ' линий') : (val + ' очков'));
-    return `<div class="list-item"><div class="li-icon">${i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1)}</div>
-    <div class="li-body"><div class="li-name">${r.name||'?'}</div>
-    <div class="li-desc">${sub}</div></div></div>`;
-  }).join('');
 }
 
-let lbTab = 'level';
+function demoPlayers() {
+  return [
+    { name: 'ProGamer', score: 42000, level: 12, mode: 'classic' },
+    { name: 'TetrisKing', score: 35500, level: 10, mode: 'sprint' },
+    { name: 'LineClear', score: 28000, level: 9, mode: 'classic' },
+    { name: 'ComboMaster', score: 21000, level: 8, mode: 'classic' },
+    { name: 'PixelDrop', score: 15000, level: 6, mode: 'sprint' },
+    { name: 'BlockNinja', score: 12000, level: 5, mode: 'classic' },
+    { name: 'StackAttack', score: 9000, level: 4, mode: 'classic' },
+    { name: 'SoftDrop', score: 6500, level: 3, mode: 'sprint' },
+  ];
+}
 
 function renderLeaderboard() {
   const list = document.getElementById('leaderboard-list');
   if (!list) return;
   list.innerHTML = '<div class="list-item"><div class="li-desc">Загрузка...</div></div>';
-  try { saveLocalLevel(); } catch(e) {}
+  saveLocalLevel();
 
-  if (!dbRef) {
-    list.innerHTML = '<div class="list-item"><div class="li-desc">Нужен интернет для топа</div></div>';
+  if (lbTab === 'level') {
+    const local = getLocalLevels();
+    const demo = demoPlayers().map(d => ({ name: d.name, level: d.level, lines: d.level * 25 }));
+    let rows = local.concat(demo);
+    const loadCloud = dbRef
+      ? dbRef.ref('/levels').limitToLast(40).once('value').then(snap => {
+          snap.forEach(c => { const v = c.val(); if (v && v.name) rows.push(v); });
+        }).catch(() => {})
+      : Promise.resolve();
+    loadCloud.finally(() => {
+      const seen = new Set();
+      const uniq = [];
+      rows.sort((a,b) => (b.level||0) - (a.level||0) || (b.lines||0) - (a.lines||0));
+      for (const r of rows) {
+        const k = String(r.name||'').toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        uniq.push(r);
+        if (uniq.length >= 20) break;
+      }
+      list.innerHTML = uniq.map((r,i) =>
+        `<div class="list-item"><div class="li-icon">${i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1)}</div>
+        <div class="li-body"><div class="li-name">${r.name||'?'}</div>
+        <div class="li-desc">Ур. ${r.level||1} · ${r.lines||0} линий</div></div></div>`
+      ).join('') || '<div class="list-item"><div class="li-desc">Пусто</div></div>';
+    });
     return;
   }
 
-  // only registered accounts
-  dbRef.ref('/accounts').once('value').then(accSnap => {
-    const registeredNames = new Set();
-    const registeredUids = new Set();
-    accSnap.forEach(c => {
-      const v = c.val();
-      if (!v) return;
-      if (v.login) registeredNames.add(String(v.login).toLowerCase());
-      if (v.uid) registeredUids.add(fbKey(v.uid));
-      registeredUids.add(fbKey(c.key));
-    });
-
-    const isReg = (row) => {
-      if (!row) return false;
-      if (row.registered === false) return false;
-      const uid = fbKey(row.uid || '');
-      const name = String(row.name || '').toLowerCase();
-      if (uid && registeredUids.has(uid)) return true;
-      if (name && registeredNames.has(name)) return true;
-      return false;
-    };
-
-    if (lbTab === 'level') {
-      return dbRef.ref('/levels').once('value').then(snap => {
-        const map = {};
-        snap.forEach(c => {
-          const v = c.val();
-          if (!v || !isReg(v)) return;
-          if (String(v.uid || '').startsWith('guest')) return;
-          const k = fbKey(v.uid || v.name);
-          if (!map[k] || (v.level||0) > (map[k].level||0)) map[k] = v;
-        });
-        const uniq = Object.values(map).sort((a,b) => (b.level||0) - (a.level||0));
-        renderLeaderboardRows(uniq, list, 'level', 'профиль');
-      });
+  // score tab
+  const local = getLocalScores();
+  const demo = demoPlayers().map(d => ({ name: d.name, score: d.score, mode: d.mode }));
+  let rows = local.concat(demo);
+  const loadCloud = (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length)
+    ? firebase.database().ref('/scores').limitToLast(50).once('value').then(snap => {
+        snap.forEach(c => { const v = c.val(); if (v && typeof v.score === 'number') rows.push(v); });
+      }).catch(() => {})
+    : Promise.resolve();
+  loadCloud.finally(() => {
+    const seen = new Set();
+    const uniq = [];
+    rows.sort((a,b) => (b.score||0) - (a.score||0));
+    for (const r of rows) {
+      const k = (r.name||'') + '|' + r.score;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      uniq.push(r);
+      if (uniq.length >= 20) break;
     }
-
-    // score / lines — marathon only (written only from classic)
-    return dbRef.ref('/scores').once('value').then(snap => {
-      const map = {};
-      snap.forEach(c => {
-        const v = c.val();
-        if (!v || !isReg(v)) return;
-        if (v.mode && v.mode !== 'classic') return;
-        if (String(v.uid || '').startsWith('guest')) return;
-        const k = fbKey(v.uid || v.name);
-        if (!map[k]) map[k] = Object.assign({}, v);
-        else {
-          map[k].score = Math.max(map[k].score||0, v.score||0);
-          map[k].lines = Math.max(map[k].lines||0, v.lines||0);
-        }
-      });
-      const key = lbTab === 'lines' ? 'lines' : 'score';
-      const uniq = Object.values(map).sort((a,b) => (b[key]||0) - (a[key]||0));
-      renderLeaderboardRows(uniq, list, key, 'марафон');
-    });
-  }).catch(() => {
-    list.innerHTML = '<div class="list-item"><div class="li-desc">Ошибка загрузки</div></div>';
+    renderLeaderboardRows(uniq, list, 'игроки');
   });
 }
 
 document.querySelectorAll('.lb-tabs .auth-tab').forEach(tab => {
   tab.addEventListener('click', () => {
-    lbTab = tab.getAttribute('data-lb') || 'level';
+    lbTab = tab.getAttribute('data-lb') || 'score';
     document.querySelectorAll('.lb-tabs .auth-tab').forEach(t => t.classList.toggle('active', t === tab));
     renderLeaderboard();
   });
 });
 
+
+// ===================== CASE =====================
+const caseBtn = document.getElementById('case-btn');
 const caseScreen = document.getElementById('case-screen');
 const returnCaseBtn = document.getElementById('return-case');
 const timerEl = document.getElementById('timer');
@@ -1031,15 +999,12 @@ returnCaseBtn?.addEventListener('click', () => {
 function updateCaseTimer() {
   const diff = caseAvailableAt - Date.now();
   if (diff <= 0) {
-    if (timerEl) timerEl.textContent = '00:00:00';
+    if (timerEl) timerEl.textContent = '00:00';
     if (openCaseBtn) openCaseBtn.disabled = false;
   } else {
-    const totalSec = Math.floor(diff / 1000);
-    const sec = totalSec % 60;
-    const min = Math.floor(totalSec / 60) % 60;
-    const hrs = Math.floor(totalSec / 3600);
-    if (timerEl) timerEl.textContent =
-      `${String(hrs).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    const sec = Math.floor(diff / 1000) % 60;
+    const min = Math.floor(diff / 60000);
+    if (timerEl) timerEl.textContent = `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
     if (openCaseBtn) openCaseBtn.disabled = true;
     setTimeout(updateCaseTimer, 1000);
   }
@@ -1782,110 +1747,47 @@ function endGame(won) {
     let youWon = false;
     if (score >= target) youWon = true;
     else if (duelOppScore >= target) youWon = false;
-    else youWon = !!won;
-
-    let finalOpp = Math.max(
-      Number(duelOppScore) || 0,
-      Number(window._lastDuelOppScore) || 0
-    );
-    try {
-      const live = document.getElementById('duel-opp');
-      if (live) {
-        const n = parseInt(String(live.textContent).replace(/\D/g,''), 10);
-        if (!isNaN(n)) finalOpp = Math.max(finalOpp, n);
-      }
-    } catch(e) {}
+    else youWon = !!won; // top-out: caller passes false for loser
 
     if (youWon) {
       stats.duelWins = (stats.duelWins || 0) + 1;
       saveStats();
       checkAchievements();
       if (titleEl) titleEl.textContent = 'ПОБЕДА';
+      if (subEl) {
+        subEl.style.display = '';
+        subEl.textContent = 'Ты победил · соперник проиграл';
+      }
     } else {
       if (titleEl) titleEl.textContent = 'ПОРАЖЕНИЕ';
-    }
-    if (subEl) {
-      subEl.style.display = 'none';
-      subEl.textContent = '';
-      subEl.hidden = true;
-    }
-    // force show opponent score
-    if (duelRow) {
-      duelRow.style.display = 'flex';
-      duelRow.hidden = false;
-      duelRow.style.visibility = 'visible';
-      const oppEl = document.getElementById('go-duel-opp');
-      if (oppEl) {
-        oppEl.textContent = String(finalOpp);
-        oppEl.style.display = '';
+      if (subEl) {
+        subEl.style.display = '';
+        subEl.textContent = 'Ты проиграл · соперник победил';
       }
     }
-    // delayed refresh from room (async scores)
-    setTimeout(() => {
+    if (duelRow) {
+      duelRow.style.display = '';
       const oppEl = document.getElementById('go-duel-opp');
-      const row = document.getElementById('go-duel-row');
-      if (row) { row.style.display = 'flex'; row.hidden = false; }
-      let best = finalOpp;
-      try {
-        const live = document.getElementById('duel-opp');
-        if (live) {
-          const n = parseInt(String(live.textContent).replace(/\D/g,''), 10);
-          if (!isNaN(n)) best = Math.max(best, n);
-        }
-      } catch(e) {}
-      if (window._lastDuelOppScore) best = Math.max(best, Number(window._lastDuelOppScore)||0);
-      if (oppEl) oppEl.textContent = String(best);
-    }, 300);
-    setTimeout(() => {
-      if (!dbRef || !duelId || !currentUser) return;
-      dbRef.ref('/duelRooms/' + duelId).once('value').then(s => {
-        const v = s.val();
-        if (!v) return;
-        const myId = fbKey(currentUser.uid);
-        const isHost = String(v.host) === myId;
-        const opp = isHost ? (Number(v.guestScore)||0) : (Number(v.hostScore)||0);
-        const oppEl = document.getElementById('go-duel-opp');
-        const row = document.getElementById('go-duel-row');
-        if (row) { row.style.display = 'flex'; row.hidden = false; }
-        if (oppEl) oppEl.textContent = String(Math.max(opp, finalOpp));
-      }).catch(()=>{});
-    }, 600);
+      if (oppEl) oppEl.textContent = String(duelOppScore || 0);
+    }
     if (retryBtn) retryBtn.style.display = 'none';
     if (tr) tr.style.display = 'none';
-
-    const applyOppFromRoom = (v) => {
-      if (!v || !currentUser) return;
-      const myId = fbKey(currentUser.uid);
-      const isHost = String(v.host) === myId;
-      const opp = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
-      if (opp > finalOpp) finalOpp = opp;
-      duelOppScore = finalOpp;
-      const oppEl = document.getElementById('go-duel-opp');
-      if (oppEl) oppEl.textContent = String(finalOpp);
-    };
-
     try {
       if (dbRef && duelId && currentUser) {
         const myId = fbKey(currentUser.uid);
         const ref = dbRef.ref('/duelRooms/' + duelId);
-        // publish my final score then read opp
         ref.once('value').then(s => {
           const v = s.val() || {};
+          if (v.status === 'finished') return;
           const isHost = String(v.host) === myId;
-          const patch = {
+          ref.update({
             status: 'finished',
             winner: youWon ? myId : (isHost ? v.guest : v.host),
+            hostScore: isHost ? score : (v.hostScore || duelOppScore),
+            guestScore: isHost ? (v.guestScore || duelOppScore) : score,
             ts: Date.now()
-          };
-          if (isHost) patch.hostScore = score;
-          else patch.guestScore = score;
-          // keep best known opp score in room
-          if (isHost) patch.guestScore = Math.max(v.guestScore || 0, finalOpp);
-          else patch.hostScore = Math.max(v.hostScore || 0, finalOpp);
-          return ref.update(patch).then(() => ref.once('value'));
-        }).then(s2 => {
-          if (s2) applyOppFromRoom(s2.val());
-        }).catch(() => {});
+          });
+        });
       }
     } catch (e) {}
   } else {
@@ -1904,22 +1806,21 @@ function endGame(won) {
     } else if (tr) tr.style.display = 'none';
   }
 
-  if (gameMode !== 'duel' && subEl) {
-    subEl.style.display = 'none';
-    subEl.textContent = '';
-    subEl.hidden = true;
-  }
-  const gs = document.getElementById('go-score');
-  if (gs) gs.textContent = score;
-  // lines & level hidden on result screen
+  document.getElementById('go-score').textContent = score;
+  const gl = document.getElementById('go-lines');
+  const glev = document.getElementById('go-level');
+  if (gl) gl.textContent = linesCleared;
+  if (glev) glev.textContent = level;
   const linesRow = document.getElementById('go-lines-row');
   const levelRow = document.getElementById('go-level-row');
-  if (linesRow) linesRow.style.display = 'none';
-  if (levelRow) levelRow.style.display = 'none';
-  submitScore(score);
-  if (goScreen) {
-    goScreen.classList.toggle('duel-go', gameMode === 'duel');
+  if (gameMode === 'duel') {
+    if (linesRow) linesRow.style.display = 'none';
+    if (levelRow) levelRow.style.display = 'none';
+  } else {
+    if (linesRow) linesRow.style.display = '';
+    if (levelRow) levelRow.style.display = '';
   }
+  submitScore(score);
   showScreen(goScreen);
 }
 
@@ -2378,7 +2279,6 @@ async function onLoggedIn(user) {
   try { listenInvites(); } catch (e) {}
   try { listenOnlineCount(); } catch (e) {}
   try { watchSessionKick(); } catch (e) {}
-  try { saveLocalLevel(); } catch (e) {}
   showScreen(modeScreen);
   // ensure visible on mobile
   const ms = document.getElementById('mode-screen');
@@ -2417,134 +2317,78 @@ function logout() {
 function bindAuthUI() {
   let mode = 'login';
   const pass2 = document.getElementById('auth-pass2');
-  const p2w = document.getElementById('auth-pass2-wrap');
   const err = document.getElementById('auth-error');
   const submit = document.getElementById('auth-submit');
-  const form = document.getElementById('auth-form');
-  const guestBtn = document.getElementById('auth-guest');
-
-  function setMode(m) {
-    mode = m === 'register' ? 'register' : 'login';
-    document.querySelectorAll('#auth-screen .auth-tab').forEach(t => {
-      t.classList.toggle('active', t.getAttribute('data-tab') === mode);
+  document.querySelectorAll('.auth-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      mode = tab.getAttribute('data-tab');
+      document.querySelectorAll('.auth-tab').forEach(t => t.classList.toggle('active', t === tab));
+      const p2w = document.getElementById('auth-pass2-wrap');
+      if (pass2) pass2.style.display = mode === 'register' ? '' : 'none';
+      if (p2w) p2w.style.display = mode === 'register' ? '' : 'none';
+      if (submit) submit.textContent = mode === 'register' ? 'Зарегистрироваться' : 'Войти';
+      const sub = document.getElementById('auth-subtitle');
+      if (sub) sub.textContent = mode === 'register' ? 'создай аккаунт' : 'вход в аккаунт';
+      if (err) err.textContent = '';
     });
-    if (pass2) {
-      if (mode === 'register') {
-        pass2.disabled = false;
-        pass2.removeAttribute('disabled');
-        pass2.setAttribute('minlength', '4');
-      } else {
-        pass2.value = '';
-        pass2.disabled = true;
-        pass2.setAttribute('disabled', 'disabled');
-        pass2.removeAttribute('minlength');
-      }
-    }
-    if (p2w) p2w.style.display = mode === 'register' ? 'block' : 'none';
-    if (submit) submit.textContent = mode === 'register' ? 'Зарегистрироваться' : 'Войти';
-    const sub = document.getElementById('auth-subtitle');
-    if (sub) sub.textContent = mode === 'register' ? 'создай аккаунт' : 'вход в аккаунт';
-    if (err) { err.textContent = ''; err.hidden = true; }
-  }
-
-  // Tabs: capture + bubble for mobile reliability
-  document.querySelectorAll('#auth-screen .auth-tab').forEach(tab => {
-    const handler = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setMode(tab.getAttribute('data-tab'));
-    };
-    tab.addEventListener('click', handler);
-    tab.addEventListener('touchend', handler, { passive: false });
   });
-
   function clearAuthError() {
     if (err) { err.textContent = ''; err.hidden = true; }
   }
-
   async function doAuth(e) {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
+    if (e) e.preventDefault();
     clearAuthError();
     const login = (document.getElementById('auth-login')?.value || '').trim();
     const pass = document.getElementById('auth-pass')?.value || '';
-    const p2 = pass2 ? (pass2.value || '') : '';
-
-    if (login.length < 3) { toast('Логин минимум 3 символа'); return; }
-    if (pass.length < 4) { toast('Пароль минимум 4 символа'); return; }
-    if (mode === 'register' && pass !== p2) { toast('Пароли не совпадают'); return; }
-
-    if (submit) {
-      submit.disabled = true;
-      submit.textContent = mode === 'register' ? 'Регистрация...' : 'Вход...';
-    }
+    const p2 = document.getElementById('auth-pass2')?.value || '';
     try {
       let user;
-      if (mode === 'register') user = await registerUser(login, pass);
-      else user = await loginUser(login, pass);
+      if (mode === 'register') {
+        if (pass !== p2) throw new Error('Пароли не совпадают');
+        user = await registerUser(login, pass);
+      } else {
+        user = await loginUser(login, pass);
+      }
       clearAuthError();
-      await onLoggedIn(user);
+      onLoggedIn(user);
     } catch (ex) {
       console.error(ex);
+      clearAuthError();
       toast(ex.message || 'Ошибка входа');
-    } finally {
-      if (submit) {
-        submit.disabled = false;
-        submit.textContent = mode === 'register' ? 'Зарегистрироваться' : 'Войти';
-      }
     }
   }
-
-  if (form) {
-    form.setAttribute('novalidate', 'novalidate');
-    form.addEventListener('submit', doAuth);
-  }
-  if (submit) {
-    submit.addEventListener('click', (e) => { e.preventDefault(); doAuth(e); });
-    submit.addEventListener('touchend', (e) => { e.preventDefault(); doAuth(e); }, { passive: false });
-  }
-
-  if (guestBtn) {
-    const goGuest = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      clearAuthError();
-      Promise.resolve(onLoggedIn(loginAsGuest())).catch(err => {
-        console.error(err);
-        toast(err.message || 'Ошибка');
-      });
-    };
-    guestBtn.addEventListener('click', goGuest);
-    guestBtn.addEventListener('touchend', goGuest, { passive: false });
-  }
-
+  document.getElementById('auth-form')?.addEventListener('submit', doAuth);
+  document.getElementById('auth-submit')?.addEventListener('click', (e) => {
+    // mobile sometimes skips submit
+    const form = document.getElementById('auth-form');
+    if (form && !form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+    doAuth(e);
+  });
+  document.getElementById('auth-guest')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    clearAuthError();
+    onLoggedIn(loginAsGuest());
+  });
+  document.getElementById('auth-guest')?.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    clearAuthError();
+    onLoggedIn(loginAsGuest());
+  }, { passive: false });
   document.getElementById('logout-btn')?.addEventListener('click', logout);
-
   document.querySelectorAll('.pass-toggle').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+    btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-target');
       const input = document.getElementById(id);
       if (!input) return;
       const show = input.type === 'password';
       input.type = show ? 'text' : 'password';
-      const open = btn.querySelector('.eye-open');
-      const off = btn.querySelector('.eye-off');
-      if (open && off) {
-        open.hidden = show;
-        off.hidden = !show;
-      }
-      btn.setAttribute('title', show ? 'Скрыть пароль' : 'Показать пароль');
+      btn.textContent = show ? '🙈' : '👁';
     });
   });
-
-  setMode('login');
 }
-
-
 
 // ===================== DUEL LOBBY =====================
 function openDuelLobby() {
@@ -2769,10 +2613,8 @@ function startDuelWithRoom(roomId, room) {
       const myId = currentUser ? fbKey(currentUser.uid) : '';
       const isHost = myId && String(v.host) === myId;
       const myScoreCloud = isHost ? (v.hostScore || 0) : (v.guestScore || 0);
-      duelOppScore = isHost ? (Number(v.guestScore) || 0) : (Number(v.hostScore) || 0);
-      window._lastDuelOppScore = duelOppScore;
+      duelOppScore = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
       const el = document.getElementById('duel-opp');
-      window._lastDuelOppScore = duelOppScore;
       if (el) el.textContent = String(duelOppScore);
       const target = settings.duelTarget || 5000;
 
@@ -2978,9 +2820,9 @@ updateCaseTimer();
 setupThemeOfDay();
 bindSettings();
 updateProfileUI();
-try { bindAuthUI(); } catch (e) { console.error('bindAuthUI', e); }
-try { bindDuelLobbyUI(); } catch (e) { console.error('bindDuel', e); }
-try { update(); } catch (e) { console.error('update', e); }
+bindAuthUI();
+bindDuelLobbyUI();
+update();
 
 try {
   if (typeof firebase !== 'undefined') {
