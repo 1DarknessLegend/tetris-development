@@ -22,15 +22,19 @@
       <button type="button" class="auth-tab active" data-tab="login">Вход</button>
       <button type="button" class="auth-tab" data-tab="register">Регистрация</button>
     </div>
-    <form id="auth-form" autocomplete="on">
+    <form id="auth-form" autocomplete="on" novalidate>
       <input type="text" id="auth-login" name="username" placeholder="Логин" required minlength="3" maxlength="16" autocomplete="username" enterkeyhint="next" />
       <div class="pass-wrap">
         <input type="password" id="auth-pass" name="password" placeholder="Пароль" required minlength="4" maxlength="32" autocomplete="current-password" enterkeyhint="done" />
-        <button type="button" class="pass-toggle" data-target="auth-pass" aria-label="Показать пароль">👁</button>
+        <button type="button" class="pass-toggle" data-target="auth-pass" aria-label="Показать пароль" title="Показать пароль">
+          <span class="eye-open">👁</span><span class="eye-off" hidden>👁‍🗨</span>
+        </button>
       </div>
       <div class="pass-wrap" id="auth-pass2-wrap" style="display:none">
-        <input type="password" id="auth-pass2" name="password2" placeholder="Повтор пароля" minlength="4" maxlength="32" autocomplete="new-password" />
-        <button type="button" class="pass-toggle" data-target="auth-pass2" aria-label="Показать пароль">👁</button>
+        <input type="password" id="auth-pass2" name="password2" placeholder="Повтор пароля" maxlength="32" autocomplete="new-password" disabled />
+        <button type="button" class="pass-toggle" data-target="auth-pass2" aria-label="Показать пароль" title="Показать пароль">
+          <span class="eye-open">👁</span><span class="eye-off" hidden>👁‍🗨</span>
+        </button>
       </div>
       <p id="auth-error" class="auth-error" hidden></p>
       <button type="submit" id="auth-submit" class="primary-btn">Войти</button>
@@ -77,10 +81,10 @@
       <span class="mode-desc">Гонка до 5000 очков</span>
     </button>
   </div>
-  <button id="open-leaderboard" class="ghost-btn menu-action-btn mode-top-btn">🏅 Топ</button>
   <div class="mode-footer">
     <button id="open-achievements" class="ghost-btn menu-action-btn">🏆 Достижения</button>
     <button id="open-quests" class="ghost-btn menu-action-btn">📋 Квесты</button>
+    <button id="open-leaderboard" class="ghost-btn menu-action-btn">🏅 Топ</button>
     <button id="open-settings" class="ghost-btn menu-action-btn">⚙️ Настройки</button>
   </div>
 </div>
@@ -90,8 +94,9 @@
   <button class="back-btn" id="lb-back">← Назад</button>
   <h1 class="screen-title">Лидерборд</h1>
   <div class="auth-tabs lb-tabs">
-    <button type="button" class="auth-tab active" data-lb="score">Очки игры</button>
-    <button type="button" class="auth-tab" data-lb="level">Уровень профиля</button>
+    <button type="button" class="auth-tab active" data-lb="level">Уровень профиля</button>
+    <button type="button" class="auth-tab" data-lb="score">Очки игры</button>
+    <button type="button" class="auth-tab" data-lb="lines">Очистка линий</button>
   </div>
   <div id="leaderboard-list" class="list-scroll"></div>
 </div>
@@ -183,12 +188,12 @@
   <div class="game-layout">
     <aside class="side-panel">
       <div class="stat-card">
-        <span class="stat-label">Рекорд</span>
-        <span class="stat-value dim" id="high-val">0</span>
-      </div>
-      <div class="stat-card">
         <span class="stat-label">Счёт</span>
         <span class="stat-value" id="score-val">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Рекорд</span>
+        <span class="stat-value dim" id="high-val">0</span>
       </div>
       <div class="stat-row">
         <div class="stat-card mini">
@@ -258,12 +263,12 @@
 <div id="gameover-screen" class="screen">
   <div class="go-card">
     <div class="go-title" id="go-title">GAME OVER</div>
-    <p class="go-subtitle" id="go-subtitle" style="display:none"></p>
-    <div class="go-stats">
+    <p class="go-subtitle" id="go-subtitle" hidden style="display:none !important"></p>
+    <div class="go-stats go-stats-compact">
       <div class="go-stat-wide"><span>Счёт</span><b id="go-score">0</b></div>
       <div class="go-stat-wide" id="go-duel-row" style="display:none"><span>Соперник</span><b id="go-duel-opp">0</b></div>
-      <div id="go-lines-row"><span>Линии</span><b id="go-lines">0</b></div>
-      <div id="go-level-row"><span>Уровень</span><b id="go-level">1</b></div>
+      <div id="go-lines-row" style="display:none"><span>Линии</span><b id="go-lines">0</b></div>
+      <div id="go-level-row" style="display:none"><span>Уровень</span><b id="go-level">1</b></div>
       <div id="go-time-row" style="display:none"><span>Время</span><b id="go-time">0:00</b></div>
     </div>
     <div class="go-actions">
