@@ -22,7 +22,7 @@
       <button type="button" class="auth-tab active" data-tab="login">Вход</button>
       <button type="button" class="auth-tab" data-tab="register">Регистрация</button>
     </div>
-    <form id="auth-form" autocomplete="on">
+    <form id="auth-form" autocomplete="on" novalidate>
       <input type="text" id="auth-login" name="username" placeholder="Логин" required minlength="3" maxlength="16" autocomplete="username" enterkeyhint="next" />
       <div class="pass-wrap">
         <input type="password" id="auth-pass" name="password" placeholder="Пароль" required minlength="4" maxlength="32" autocomplete="current-password" enterkeyhint="done" />
@@ -31,7 +31,7 @@
         </button>
       </div>
       <div class="pass-wrap" id="auth-pass2-wrap" style="display:none">
-        <input type="password" id="auth-pass2" name="password2" placeholder="Повтор пароля" minlength="4" maxlength="32" autocomplete="new-password" />
+        <input type="password" id="auth-pass2" name="password2" placeholder="Повтор пароля" maxlength="32" autocomplete="new-password" disabled />
         <button type="button" class="pass-toggle" data-target="auth-pass2" aria-label="Показать пароль" title="Показать пароль">
           <span class="eye-open">👁</span><span class="eye-off" hidden>👁‍🗨</span>
         </button>

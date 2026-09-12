@@ -1731,3 +1731,15 @@ body > .profile-bar:not(.center-profile) {
   font-size: 12px;
   padding: 8px 6px;
 }
+
+#auth-screen, #auth-screen.active-screen {
+  z-index: 100 !important;
+  pointer-events: auto !important;
+  opacity: 1 !important;
+}
+.auth-card, #auth-form, #auth-form input, #auth-form button {
+  pointer-events: auto !important;
+}
+#auth-form input:disabled {
+  opacity: 0.5;
+}

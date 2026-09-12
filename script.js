@@ -2324,69 +2324,119 @@ function logout() {
 function bindAuthUI() {
   let mode = 'login';
   const pass2 = document.getElementById('auth-pass2');
+  const p2w = document.getElementById('auth-pass2-wrap');
   const err = document.getElementById('auth-error');
   const submit = document.getElementById('auth-submit');
-  document.querySelectorAll('.auth-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      mode = tab.getAttribute('data-tab');
-      document.querySelectorAll('.auth-tab').forEach(t => t.classList.toggle('active', t === tab));
-      const p2w = document.getElementById('auth-pass2-wrap');
-      if (pass2) pass2.style.display = mode === 'register' ? '' : 'none';
-      if (p2w) p2w.style.display = mode === 'register' ? '' : 'none';
-      if (submit) submit.textContent = mode === 'register' ? 'Зарегистрироваться' : 'Войти';
-      const sub = document.getElementById('auth-subtitle');
-      if (sub) sub.textContent = mode === 'register' ? 'создай аккаунт' : 'вход в аккаунт';
-      if (err) err.textContent = '';
+  const form = document.getElementById('auth-form');
+
+  function setMode(m) {
+    mode = m === 'register' ? 'register' : 'login';
+    document.querySelectorAll('#auth-screen .auth-tab').forEach(t => {
+      t.classList.toggle('active', t.getAttribute('data-tab') === mode);
+    });
+    if (pass2) {
+      pass2.disabled = mode !== 'register';
+      if (mode === 'register') {
+        pass2.removeAttribute('disabled');
+        pass2.setAttribute('minlength', '4');
+      } else {
+        pass2.value = '';
+        pass2.setAttribute('disabled', 'disabled');
+        pass2.removeAttribute('minlength');
+      }
+    }
+    if (p2w) p2w.style.display = mode === 'register' ? '' : 'none';
+    if (submit) submit.textContent = mode === 'register' ? 'Зарегистрироваться' : 'Войти';
+    const sub = document.getElementById('auth-subtitle');
+    if (sub) sub.textContent = mode === 'register' ? 'создай аккаунт' : 'вход в аккаунт';
+    if (err) { err.textContent = ''; err.hidden = true; }
+  }
+
+  document.querySelectorAll('#auth-screen .auth-tab').forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      e.preventDefault();
+      setMode(tab.getAttribute('data-tab'));
     });
   });
+
   function clearAuthError() {
     if (err) { err.textContent = ''; err.hidden = true; }
   }
+
   async function doAuth(e) {
-    if (e) e.preventDefault();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     clearAuthError();
     const login = (document.getElementById('auth-login')?.value || '').trim();
     const pass = document.getElementById('auth-pass')?.value || '';
     const p2 = document.getElementById('auth-pass2')?.value || '';
+
+    if (login.length < 3) {
+      toast('Логин минимум 3 символа');
+      return;
+    }
+    if (pass.length < 4) {
+      toast('Пароль минимум 4 символа');
+      return;
+    }
+    if (mode === 'register' && pass !== p2) {
+      toast('Пароли не совпадают');
+      return;
+    }
+
+    if (submit) {
+      submit.disabled = true;
+      submit.textContent = mode === 'register' ? 'Регистрация...' : 'Вход...';
+    }
     try {
       let user;
       if (mode === 'register') {
-        if (pass !== p2) throw new Error('Пароли не совпадают');
         user = await registerUser(login, pass);
       } else {
         user = await loginUser(login, pass);
       }
       clearAuthError();
-      onLoggedIn(user);
+      await onLoggedIn(user);
     } catch (ex) {
       console.error(ex);
       clearAuthError();
       toast(ex.message || 'Ошибка входа');
+    } finally {
+      if (submit) {
+        submit.disabled = false;
+        submit.textContent = mode === 'register' ? 'Зарегистрироваться' : 'Войти';
+      }
     }
   }
-  document.getElementById('auth-form')?.addEventListener('submit', doAuth);
-  document.getElementById('auth-submit')?.addEventListener('click', (e) => {
-    // mobile sometimes skips submit
-    const form = document.getElementById('auth-form');
-    if (form && !form.checkValidity()) {
-      form.reportValidity();
-      return;
-    }
-    doAuth(e);
-  });
-  document.getElementById('auth-guest')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    clearAuthError();
-    onLoggedIn(loginAsGuest());
-  });
-  document.getElementById('auth-guest')?.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    clearAuthError();
-    onLoggedIn(loginAsGuest());
-  }, { passive: false });
+
+  if (form) {
+    form.addEventListener('submit', doAuth);
+  }
+  if (submit) {
+    submit.addEventListener('click', (e) => {
+      e.preventDefault();
+      doAuth(e);
+    });
+  }
+
+  const guestBtn = document.getElementById('auth-guest');
+  if (guestBtn) {
+    const goGuest = (e) => {
+      e.preventDefault();
+      clearAuthError();
+      onLoggedIn(loginAsGuest());
+    };
+    guestBtn.addEventListener('click', goGuest);
+  }
+
   document.getElementById('logout-btn')?.addEventListener('click', logout);
+
   document.querySelectorAll('.pass-toggle').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       const id = btn.getAttribute('data-target');
       const input = document.getElementById(id);
       if (!input) return;
@@ -2397,12 +2447,12 @@ function bindAuthUI() {
       if (open && off) {
         open.hidden = show;
         off.hidden = !show;
-      } else {
-        btn.textContent = show ? '👁‍🗨' : '👁';
       }
       btn.setAttribute('title', show ? 'Скрыть пароль' : 'Показать пароль');
     });
   });
+
+  setMode('login');
 }
 
 // ===================== DUEL LOBBY =====================
