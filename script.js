@@ -113,15 +113,24 @@ function applyUserData(data) {
   highScore = 0;
   highScores = { classic: 0, sprint: 0, duel: 0 };
   balance = 0;
-  themes.forEach(t => { bought[t] = false; active[t] = false; });
+  try {
+    if (typeof themes !== 'undefined' && themes) {
+      themes.forEach(t => { bought[t] = false; if (typeof active !== 'undefined') active[t] = false; });
+    }
+  } catch (e) {}
   stats = defaultUserData().stats;
   seasonClaimed = {};
   caseAvailableAt = 0;
-  quests = {
-    date: todayKey(),
-    ver: 2,
-    items: QUEST_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 10).map(q => ({ ...q, progress: 0, claimed: false }))
-  };
+  try {
+    const pool = (typeof QUEST_POOL !== 'undefined' && QUEST_POOL) ? QUEST_POOL : [];
+    quests = {
+      date: todayKey(),
+      ver: 2,
+      items: pool.slice().sort(() => Math.random() - 0.5).slice(0, 10).map(q => ({ ...q, progress: 0, claimed: false }))
+    };
+  } catch (e) {
+    quests = { date: todayKey(), ver: 2, items: [] };
+  }
 
   data = data || defaultUserData();
   highScores = Object.assign({ classic: 0, sprint: 0, duel: 0 }, data.highScores || {});
@@ -130,7 +139,11 @@ function applyUserData(data) {
   highScore = highScores.classic || 0;
   balance = data.balance || 0;
   const b = data.bought || {};
-  themes.forEach(t => { bought[t] = !!b[t]; });
+  try {
+    if (typeof themes !== 'undefined' && themes) {
+      themes.forEach(t => { bought[t] = !!b[t]; });
+    }
+  } catch (e) {}
   stats = Object.assign(defaultUserData().stats, data.stats || {});
   if (!stats.unlocked) stats.unlocked = {};
   seasonClaimed = data.seasonClaimed || {};
@@ -2328,6 +2341,7 @@ function bindAuthUI() {
   const err = document.getElementById('auth-error');
   const submit = document.getElementById('auth-submit');
   const form = document.getElementById('auth-form');
+  const guestBtn = document.getElementById('auth-guest');
 
   function setMode(m) {
     mode = m === 'register' ? 'register' : 'login';
@@ -2335,28 +2349,33 @@ function bindAuthUI() {
       t.classList.toggle('active', t.getAttribute('data-tab') === mode);
     });
     if (pass2) {
-      pass2.disabled = mode !== 'register';
       if (mode === 'register') {
+        pass2.disabled = false;
         pass2.removeAttribute('disabled');
         pass2.setAttribute('minlength', '4');
       } else {
         pass2.value = '';
+        pass2.disabled = true;
         pass2.setAttribute('disabled', 'disabled');
         pass2.removeAttribute('minlength');
       }
     }
-    if (p2w) p2w.style.display = mode === 'register' ? '' : 'none';
+    if (p2w) p2w.style.display = mode === 'register' ? 'block' : 'none';
     if (submit) submit.textContent = mode === 'register' ? 'Зарегистрироваться' : 'Войти';
     const sub = document.getElementById('auth-subtitle');
     if (sub) sub.textContent = mode === 'register' ? 'создай аккаунт' : 'вход в аккаунт';
     if (err) { err.textContent = ''; err.hidden = true; }
   }
 
+  // Tabs: capture + bubble for mobile reliability
   document.querySelectorAll('#auth-screen .auth-tab').forEach(tab => {
-    tab.addEventListener('click', (e) => {
+    const handler = (e) => {
       e.preventDefault();
+      e.stopPropagation();
       setMode(tab.getAttribute('data-tab'));
-    });
+    };
+    tab.addEventListener('click', handler);
+    tab.addEventListener('touchend', handler, { passive: false });
   });
 
   function clearAuthError() {
@@ -2371,20 +2390,11 @@ function bindAuthUI() {
     clearAuthError();
     const login = (document.getElementById('auth-login')?.value || '').trim();
     const pass = document.getElementById('auth-pass')?.value || '';
-    const p2 = document.getElementById('auth-pass2')?.value || '';
+    const p2 = pass2 ? (pass2.value || '') : '';
 
-    if (login.length < 3) {
-      toast('Логин минимум 3 символа');
-      return;
-    }
-    if (pass.length < 4) {
-      toast('Пароль минимум 4 символа');
-      return;
-    }
-    if (mode === 'register' && pass !== p2) {
-      toast('Пароли не совпадают');
-      return;
-    }
+    if (login.length < 3) { toast('Логин минимум 3 символа'); return; }
+    if (pass.length < 4) { toast('Пароль минимум 4 символа'); return; }
+    if (mode === 'register' && pass !== p2) { toast('Пароли не совпадают'); return; }
 
     if (submit) {
       submit.disabled = true;
@@ -2392,16 +2402,12 @@ function bindAuthUI() {
     }
     try {
       let user;
-      if (mode === 'register') {
-        user = await registerUser(login, pass);
-      } else {
-        user = await loginUser(login, pass);
-      }
+      if (mode === 'register') user = await registerUser(login, pass);
+      else user = await loginUser(login, pass);
       clearAuthError();
       await onLoggedIn(user);
     } catch (ex) {
       console.error(ex);
-      clearAuthError();
       toast(ex.message || 'Ошибка входа');
     } finally {
       if (submit) {
@@ -2412,23 +2418,26 @@ function bindAuthUI() {
   }
 
   if (form) {
+    form.setAttribute('novalidate', 'novalidate');
     form.addEventListener('submit', doAuth);
   }
   if (submit) {
-    submit.addEventListener('click', (e) => {
-      e.preventDefault();
-      doAuth(e);
-    });
+    submit.addEventListener('click', (e) => { e.preventDefault(); doAuth(e); });
+    submit.addEventListener('touchend', (e) => { e.preventDefault(); doAuth(e); }, { passive: false });
   }
 
-  const guestBtn = document.getElementById('auth-guest');
   if (guestBtn) {
     const goGuest = (e) => {
       e.preventDefault();
+      e.stopPropagation();
       clearAuthError();
-      onLoggedIn(loginAsGuest());
+      Promise.resolve(onLoggedIn(loginAsGuest())).catch(err => {
+        console.error(err);
+        toast(err.message || 'Ошибка');
+      });
     };
     guestBtn.addEventListener('click', goGuest);
+    guestBtn.addEventListener('touchend', goGuest, { passive: false });
   }
 
   document.getElementById('logout-btn')?.addEventListener('click', logout);
@@ -2454,6 +2463,8 @@ function bindAuthUI() {
 
   setMode('login');
 }
+
+
 
 // ===================== DUEL LOBBY =====================
 function openDuelLobby() {
@@ -2885,9 +2896,9 @@ updateCaseTimer();
 setupThemeOfDay();
 bindSettings();
 updateProfileUI();
-bindAuthUI();
-bindDuelLobbyUI();
-update();
+try { bindAuthUI(); } catch (e) { console.error('bindAuthUI', e); }
+try { bindDuelLobbyUI(); } catch (e) { console.error('bindDuel', e); }
+try { update(); } catch (e) { console.error('update', e); }
 
 try {
   if (typeof firebase !== 'undefined') {
