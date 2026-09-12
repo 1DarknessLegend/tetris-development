@@ -1588,3 +1588,87 @@ body > .profile-bar:not(.center-profile) {
   margin-right: auto;
   box-sizing: border-box;
 }
+
+/* password toggle */
+.pass-wrap {
+  position: relative;
+  width: 100%;
+}
+.pass-wrap input {
+  width: 100%;
+  padding-right: 44px !important;
+  box-sizing: border-box;
+}
+.pass-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 6px;
+}
+
+/* top button under modes */
+.mode-top-btn {
+  width: 100%;
+  max-width: 340px;
+  margin: 8px auto 0;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  border-radius: 14px !important;
+  min-height: 48px;
+  box-sizing: border-box;
+}
+
+/* equal title padding on secondary screens */
+#achievements-screen .screen-title,
+#quests-screen .screen-title,
+#settings-screen .screen-title,
+#shop-screen .screen-title,
+#leaderboard-screen .screen-title,
+#case-screen .screen-title {
+  margin-top: 16px !important;
+  margin-bottom: 16px !important;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+/* go stats full width like share */
+.go-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.go-stats > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.go-stat-wide {
+  width: 100% !important;
+}
+.go-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.go-actions .primary-btn,
+.go-actions .ghost-btn {
+  width: 100%;
+}

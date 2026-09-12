@@ -629,20 +629,28 @@ function showScreen(el) {
 }
 
 document.getElementById('shop')?.addEventListener('click', () => {
+  if (gameMode === 'duel' && !gameOver) {
+    toast('В дуэли магазин недоступен');
+    return;
+  }
   showScreen(shopDiv);
   paused = true;
 });
 document.getElementById('return-shop')?.addEventListener('click', () => {
   showScreen(gameDiv);
-  paused = false;
+  // keep pause state
 });
 document.getElementById('easter-egg')?.addEventListener('click', () => {
+  if (gameMode === 'duel' && !gameOver) {
+    toast('В дуэли пасхалка недоступна');
+    return;
+  }
   showScreen(easterDiv);
   paused = true;
 });
 document.getElementById('return')?.addEventListener('click', () => {
   showScreen(gameDiv);
-  paused = false;
+  // keep pause state
 });
 document.getElementById('menu-btn')?.addEventListener('click', () => {
   if (gameMode === 'duel' && !gameOver) {
@@ -975,13 +983,17 @@ let caseAvailableAt = 0;
 const rewards = [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000];
 
 caseBtn?.addEventListener('click', () => {
+  if (gameMode === 'duel' && !gameOver) {
+    toast('В дуэли кейс недоступен');
+    return;
+  }
   updateCaseTimer();
   showScreen(caseScreen);
   paused = true;
 });
 returnCaseBtn?.addEventListener('click', () => {
   showScreen(gameDiv);
-  paused = false;
+  // keep pause state
 });
 
 function updateCaseTimer() {
@@ -1059,7 +1071,7 @@ openCaseBtn?.addEventListener('click', () => {
       stats.casesOpened = (stats.casesOpened || 0) + 1;
       saveStats();
       checkAchievements();
-      caseAvailableAt = Date.now() + 5 * 60 * 1000;
+      caseAvailableAt = Date.now() + 60 * 60 * 1000;
       saveUserData();
       updateCaseTimer();
     };
@@ -1795,8 +1807,19 @@ function endGame(won) {
   }
 
   document.getElementById('go-score').textContent = score;
-  document.getElementById('go-lines').textContent = linesCleared;
-  document.getElementById('go-level').textContent = level;
+  const gl = document.getElementById('go-lines');
+  const glev = document.getElementById('go-level');
+  if (gl) gl.textContent = linesCleared;
+  if (glev) glev.textContent = level;
+  const linesRow = document.getElementById('go-lines-row');
+  const levelRow = document.getElementById('go-level-row');
+  if (gameMode === 'duel') {
+    if (linesRow) linesRow.style.display = 'none';
+    if (levelRow) levelRow.style.display = 'none';
+  } else {
+    if (linesRow) linesRow.style.display = '';
+    if (levelRow) levelRow.style.display = '';
+  }
   submitScore(score);
   showScreen(goScreen);
 }
@@ -2300,7 +2323,9 @@ function bindAuthUI() {
     tab.addEventListener('click', () => {
       mode = tab.getAttribute('data-tab');
       document.querySelectorAll('.auth-tab').forEach(t => t.classList.toggle('active', t === tab));
+      const p2w = document.getElementById('auth-pass2-wrap');
       if (pass2) pass2.style.display = mode === 'register' ? '' : 'none';
+      if (p2w) p2w.style.display = mode === 'register' ? '' : 'none';
       if (submit) submit.textContent = mode === 'register' ? 'Зарегистрироваться' : 'Войти';
       const sub = document.getElementById('auth-subtitle');
       if (sub) sub.textContent = mode === 'register' ? 'создай аккаунт' : 'вход в аккаунт';
@@ -2353,6 +2378,16 @@ function bindAuthUI() {
     onLoggedIn(loginAsGuest());
   }, { passive: false });
   document.getElementById('logout-btn')?.addEventListener('click', logout);
+  document.querySelectorAll('.pass-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-target');
+      const input = document.getElementById(id);
+      if (!input) return;
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.textContent = show ? '🙈' : '👁';
+    });
+  });
 }
 
 // ===================== DUEL LOBBY =====================
