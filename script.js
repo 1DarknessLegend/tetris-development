@@ -77,7 +77,7 @@ function defaultUserData() {
     balance: 0,
     bought: {},
     stats: {
-      totalLines: 0, bestScore: 0, tetrises: 0, maxCombo: 0,
+      totalLines: 0, marathonLines: 0, bestScore: 0, tetrises: 0, maxCombo: 0,
       maxLevel: 1, sprints: 0, themesBought: 0, casesOpened: 0,
       tspins: 0, hungerLines: 0, gamesPlayed: 0, duelWins: 0, unlocked: {}
     },
@@ -113,15 +113,24 @@ function applyUserData(data) {
   highScore = 0;
   highScores = { classic: 0, sprint: 0, duel: 0 };
   balance = 0;
-  themes.forEach(t => { bought[t] = false; active[t] = false; });
+  try {
+    if (typeof themes !== 'undefined' && themes) {
+      themes.forEach(t => { bought[t] = false; if (typeof active !== 'undefined') active[t] = false; });
+    }
+  } catch (e) {}
   stats = defaultUserData().stats;
   seasonClaimed = {};
   caseAvailableAt = 0;
-  quests = {
-    date: todayKey(),
-    ver: 2,
-    items: QUEST_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 10).map(q => ({ ...q, progress: 0, claimed: false }))
-  };
+  try {
+    const pool = (typeof QUEST_POOL !== 'undefined' && QUEST_POOL) ? QUEST_POOL : [];
+    quests = {
+      date: todayKey(),
+      ver: 2,
+      items: pool.slice().sort(() => Math.random() - 0.5).slice(0, 10).map(q => ({ ...q, progress: 0, claimed: false }))
+    };
+  } catch (e) {
+    quests = { date: todayKey(), ver: 2, items: [] };
+  }
 
   data = data || defaultUserData();
   highScores = Object.assign({ classic: 0, sprint: 0, duel: 0 }, data.highScores || {});
@@ -130,7 +139,11 @@ function applyUserData(data) {
   highScore = highScores.classic || 0;
   balance = data.balance || 0;
   const b = data.bought || {};
-  themes.forEach(t => { bought[t] = !!b[t]; });
+  try {
+    if (typeof themes !== 'undefined' && themes) {
+      themes.forEach(t => { bought[t] = !!b[t]; });
+    }
+  } catch (e) {}
   stats = Object.assign(defaultUserData().stats, data.stats || {});
   if (!stats.unlocked) stats.unlocked = {};
   seasonClaimed = data.seasonClaimed || {};
@@ -847,27 +860,36 @@ function saveLocalScore(entry) {
 }
 
 function submitScore(sc) {
-  // Only marathon (classic) counts for score / lines leaderboards
-  if (gameMode !== 'classic') return;
+  // Only registered users; score & lines boards = marathon only
   if (!currentUser || currentUser.guest) return;
   if (!dbRef) return;
   const name = currentUser.login;
   const uid = fbKey(currentUser.uid);
   try {
-    const ref = dbRef.ref('/scores/' + uid);
-    ref.once('value').then(s => {
-      const prev = s.val() || {};
-      const bestScore = Math.max(prev.score || 0, sc || 0);
-      const bestLines = Math.max(prev.lines || 0, linesCleared || 0);
-      ref.set({
-        name,
-        uid,
-        score: bestScore,
-        lines: bestLines,
-        mode: 'classic',
-        registered: true,
-        ts: Date.now()
+    if (gameMode === 'classic') {
+      const ref = dbRef.ref('/scores/' + uid);
+      ref.once('value').then(s => {
+        const prev = s.val() || {};
+        const bestScore = Math.max(prev.score || 0, sc || 0, highScores.classic || 0);
+        const bestLines = Math.max(prev.lines || 0, stats.marathonLines || 0);
+        ref.set({
+          name,
+          uid,
+          score: bestScore,
+          lines: bestLines,
+          mode: 'classic',
+          registered: true,
+          ts: Date.now()
+        });
       });
+    }
+    // profile level always
+    dbRef.ref('/levels/' + uid).set({
+      name,
+      uid,
+      level: profileLevel(),
+      registered: true,
+      ts: Date.now()
     });
   } catch (e) { console.warn('submitScore', e); }
 }
@@ -905,58 +927,69 @@ function renderLeaderboard() {
   const list = document.getElementById('leaderboard-list');
   if (!list) return;
   list.innerHTML = '<div class="list-item"><div class="li-desc">Загрузка...</div></div>';
-  saveLocalLevel();
+  try { saveLocalLevel(); } catch(e) {}
 
   if (!dbRef) {
     list.innerHTML = '<div class="list-item"><div class="li-desc">Нужен интернет для топа</div></div>';
     return;
   }
 
-  if (lbTab === 'level') {
-    dbRef.ref('/levels').limitToLast(50).once('value').then(snap => {
-      const rows = [];
+  // only registered accounts
+  dbRef.ref('/accounts').once('value').then(accSnap => {
+    const registeredNames = new Set();
+    const registeredUids = new Set();
+    accSnap.forEach(c => {
+      const v = c.val();
+      if (!v) return;
+      if (v.login) registeredNames.add(String(v.login).toLowerCase());
+      if (v.uid) registeredUids.add(fbKey(v.uid));
+      registeredUids.add(fbKey(c.key));
+    });
+
+    const isReg = (row) => {
+      if (!row) return false;
+      if (row.registered === false) return false;
+      const uid = fbKey(row.uid || '');
+      const name = String(row.name || '').toLowerCase();
+      if (uid && registeredUids.has(uid)) return true;
+      if (name && registeredNames.has(name)) return true;
+      return false;
+    };
+
+    if (lbTab === 'level') {
+      return dbRef.ref('/levels').once('value').then(snap => {
+        const map = {};
+        snap.forEach(c => {
+          const v = c.val();
+          if (!v || !isReg(v)) return;
+          if (String(v.uid || '').startsWith('guest')) return;
+          const k = fbKey(v.uid || v.name);
+          if (!map[k] || (v.level||0) > (map[k].level||0)) map[k] = v;
+        });
+        const uniq = Object.values(map).sort((a,b) => (b.level||0) - (a.level||0));
+        renderLeaderboardRows(uniq, list, 'level', 'профиль');
+      });
+    }
+
+    // score / lines — marathon only (written only from classic)
+    return dbRef.ref('/scores').once('value').then(snap => {
+      const map = {};
       snap.forEach(c => {
         const v = c.val();
-        if (!v || !v.name || !v.registered) return;
+        if (!v || !isReg(v)) return;
+        if (v.mode && v.mode !== 'classic') return;
         if (String(v.uid || '').startsWith('guest')) return;
-        rows.push(v);
+        const k = fbKey(v.uid || v.name);
+        if (!map[k]) map[k] = Object.assign({}, v);
+        else {
+          map[k].score = Math.max(map[k].score||0, v.score||0);
+          map[k].lines = Math.max(map[k].lines||0, v.lines||0);
+        }
       });
-      // unique by uid/name keep best level
-      const map = {};
-      rows.forEach(r => {
-        const k = r.uid || r.name;
-        if (!map[k] || (r.level||0) > (map[k].level||0)) map[k] = r;
-      });
-      const uniq = Object.values(map).sort((a,b) => (b.level||0) - (a.level||0));
-      renderLeaderboardRows(uniq, list, 'level', 'профиль');
-    }).catch(() => {
-      list.innerHTML = '<div class="list-item"><div class="li-desc">Ошибка загрузки</div></div>';
+      const key = lbTab === 'lines' ? 'lines' : 'score';
+      const uniq = Object.values(map).sort((a,b) => (b[key]||0) - (a[key]||0));
+      renderLeaderboardRows(uniq, list, key, 'марафон');
     });
-    return;
-  }
-
-  // score or lines — from /scores, marathon only
-  dbRef.ref('/scores').limitToLast(50).once('value').then(snap => {
-    const rows = [];
-    snap.forEach(c => {
-      const v = c.val();
-      if (!v || !v.name || !v.registered) return;
-      if (v.mode && v.mode !== 'classic') return;
-      if (String(v.uid || '').startsWith('guest')) return;
-      rows.push(v);
-    });
-    const map = {};
-    rows.forEach(r => {
-      const k = r.uid || r.name;
-      if (!map[k]) map[k] = r;
-      else {
-        map[k].score = Math.max(map[k].score||0, r.score||0);
-        map[k].lines = Math.max(map[k].lines||0, r.lines||0);
-      }
-    });
-    const key = lbTab === 'lines' ? 'lines' : 'score';
-    const uniq = Object.values(map).sort((a,b) => (b[key]||0) - (a[key]||0));
-    renderLeaderboardRows(uniq, list, key, 'марафон');
   }).catch(() => {
     list.innerHTML = '<div class="list-item"><div class="li-desc">Ошибка загрузки</div></div>';
   });
@@ -994,12 +1027,15 @@ returnCaseBtn?.addEventListener('click', () => {
 function updateCaseTimer() {
   const diff = caseAvailableAt - Date.now();
   if (diff <= 0) {
-    if (timerEl) timerEl.textContent = '00:00';
+    if (timerEl) timerEl.textContent = '00:00:00';
     if (openCaseBtn) openCaseBtn.disabled = false;
   } else {
-    const sec = Math.floor(diff / 1000) % 60;
-    const min = Math.floor(diff / 60000);
-    if (timerEl) timerEl.textContent = `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    const totalSec = Math.floor(diff / 1000);
+    const sec = totalSec % 60;
+    const min = Math.floor(totalSec / 60) % 60;
+    const hrs = Math.floor(totalSec / 3600);
+    if (timerEl) timerEl.textContent =
+      `${String(hrs).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
     if (openCaseBtn) openCaseBtn.disabled = true;
     setTimeout(updateCaseTimer, 1000);
   }
@@ -1323,6 +1359,7 @@ function arenaSweep() {
     balance += gained;
     linesCleared += rowCount;
     stats.totalLines += rowCount;
+    if (gameMode === 'classic') stats.marathonLines = (stats.marathonLines || 0) + rowCount;
     if (gameMode === 'hunger') stats.hungerLines = (stats.hungerLines || 0) + rowCount;
     questProgress('lines', rowCount);
     questProgress('score', gained);
@@ -1742,7 +1779,19 @@ function endGame(won) {
     let youWon = false;
     if (score >= target) youWon = true;
     else if (duelOppScore >= target) youWon = false;
-    else youWon = !!won; // top-out: caller passes false for loser
+    else youWon = !!won;
+
+    let finalOpp = Math.max(
+      Number(duelOppScore) || 0,
+      Number(window._lastDuelOppScore) || 0
+    );
+    try {
+      const live = document.getElementById('duel-opp');
+      if (live) {
+        const n = parseInt(String(live.textContent).replace(/\D/g,''), 10);
+        if (!isNaN(n)) finalOpp = Math.max(finalOpp, n);
+      }
+    } catch(e) {}
 
     if (youWon) {
       stats.duelWins = (stats.duelWins || 0) + 1;
@@ -1754,47 +1803,83 @@ function endGame(won) {
     }
     if (subEl) {
       subEl.style.display = 'none';
-      subEl.textContent = '';
+      subEl.hidden = true;
     }
+    // Always show opponent score row with a number
     if (duelRow) {
       duelRow.style.display = 'flex';
-      const oppEl = document.getElementById('go-duel-opp');
-      const showOpp = () => {
-        if (oppEl) oppEl.textContent = String(duelOppScore || 0);
-      };
-      showOpp();
-      // refresh from room if still 0
-      if ((!duelOppScore || duelOppScore === 0) && dbRef && duelId) {
-        try {
-          dbRef.ref('/duelRooms/' + duelId).once('value').then(s => {
-            const v = s.val();
-            if (!v || !currentUser) return;
-            const myId = fbKey(currentUser.uid);
-            const isHost = String(v.host) === myId;
-            duelOppScore = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
-            showOpp();
-          });
-        } catch(e) {}
-      }
+      duelRow.hidden = false;
+      duelRow.removeAttribute('hidden');
     }
+    const oppEl0 = document.getElementById('go-duel-opp');
+    if (oppEl0) oppEl0.textContent = String(finalOpp || 0);
+    window._lastDuelOppScore = finalOpp || 0;
+    // delayed refresh from room (async scores)
+    setTimeout(() => {
+      const oppEl = document.getElementById('go-duel-opp');
+      const row = document.getElementById('go-duel-row');
+      if (row) { row.style.display = 'flex'; row.hidden = false; }
+      let best = finalOpp;
+      try {
+        const live = document.getElementById('duel-opp');
+        if (live) {
+          const n = parseInt(String(live.textContent).replace(/\D/g,''), 10);
+          if (!isNaN(n)) best = Math.max(best, n);
+        }
+      } catch(e) {}
+      if (window._lastDuelOppScore) best = Math.max(best, Number(window._lastDuelOppScore)||0);
+      if (oppEl) oppEl.textContent = String(best);
+    }, 300);
+    setTimeout(() => {
+      if (!dbRef || !duelId || !currentUser) return;
+      dbRef.ref('/duelRooms/' + duelId).once('value').then(s => {
+        const v = s.val();
+        if (!v) return;
+        const myId = fbKey(currentUser.uid);
+        const isHost = String(v.host) === myId;
+        const opp = isHost ? (Number(v.guestScore)||0) : (Number(v.hostScore)||0);
+        const oppEl = document.getElementById('go-duel-opp');
+        const row = document.getElementById('go-duel-row');
+        if (row) { row.style.display = 'flex'; row.hidden = false; }
+        if (oppEl) oppEl.textContent = String(Math.max(opp, finalOpp));
+      }).catch(()=>{});
+    }, 600);
     if (retryBtn) retryBtn.style.display = 'none';
     if (tr) tr.style.display = 'none';
+
+    const applyOppFromRoom = (v) => {
+      if (!v || !currentUser) return;
+      const myId = fbKey(currentUser.uid);
+      const isHost = String(v.host) === myId;
+      const opp = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
+      if (opp > finalOpp) finalOpp = opp;
+      duelOppScore = finalOpp;
+      const oppEl = document.getElementById('go-duel-opp');
+      if (oppEl) oppEl.textContent = String(finalOpp);
+    };
+
     try {
       if (dbRef && duelId && currentUser) {
         const myId = fbKey(currentUser.uid);
         const ref = dbRef.ref('/duelRooms/' + duelId);
+        // publish my final score then read opp
         ref.once('value').then(s => {
           const v = s.val() || {};
-          if (v.status === 'finished') return;
           const isHost = String(v.host) === myId;
-          ref.update({
+          const patch = {
             status: 'finished',
             winner: youWon ? myId : (isHost ? v.guest : v.host),
-            hostScore: isHost ? score : (v.hostScore || duelOppScore),
-            guestScore: isHost ? (v.guestScore || duelOppScore) : score,
             ts: Date.now()
-          });
-        });
+          };
+          if (isHost) patch.hostScore = score;
+          else patch.guestScore = score;
+          // keep best known opp score in room
+          if (isHost) patch.guestScore = Math.max(v.guestScore || 0, finalOpp);
+          else patch.hostScore = Math.max(v.hostScore || 0, finalOpp);
+          return ref.update(patch).then(() => ref.once('value'));
+        }).then(s2 => {
+          if (s2) applyOppFromRoom(s2.val());
+        }).catch(() => {});
       }
     } catch (e) {}
   } else {
@@ -1813,21 +1898,22 @@ function endGame(won) {
     } else if (tr) tr.style.display = 'none';
   }
 
-  document.getElementById('go-score').textContent = score;
-  const gl = document.getElementById('go-lines');
-  const glev = document.getElementById('go-level');
-  if (gl) gl.textContent = linesCleared;
-  if (glev) glev.textContent = level;
+  if (gameMode !== 'duel' && subEl) {
+    subEl.style.display = 'none';
+    subEl.textContent = '';
+    subEl.hidden = true;
+  }
+  const gs = document.getElementById('go-score');
+  if (gs) gs.textContent = score;
+  // lines & level hidden on result screen
   const linesRow = document.getElementById('go-lines-row');
   const levelRow = document.getElementById('go-level-row');
-  if (gameMode === 'duel') {
-    if (linesRow) linesRow.style.display = 'none';
-    if (levelRow) levelRow.style.display = 'none';
-  } else {
-    if (linesRow) linesRow.style.display = '';
-    if (levelRow) levelRow.style.display = '';
-  }
+  if (linesRow) linesRow.style.display = 'none';
+  if (levelRow) levelRow.style.display = 'none';
   submitScore(score);
+  if (goScreen) {
+    goScreen.classList.toggle('duel-go', gameMode === 'duel');
+  }
   showScreen(goScreen);
 }
 
@@ -2286,6 +2372,7 @@ async function onLoggedIn(user) {
   try { listenInvites(); } catch (e) {}
   try { listenOnlineCount(); } catch (e) {}
   try { watchSessionKick(); } catch (e) {}
+  try { saveLocalLevel(); } catch (e) {}
   showScreen(modeScreen);
   // ensure visible on mobile
   const ms = document.getElementById('mode-screen');
@@ -2324,69 +2411,115 @@ function logout() {
 function bindAuthUI() {
   let mode = 'login';
   const pass2 = document.getElementById('auth-pass2');
+  const p2w = document.getElementById('auth-pass2-wrap');
   const err = document.getElementById('auth-error');
   const submit = document.getElementById('auth-submit');
-  document.querySelectorAll('.auth-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      mode = tab.getAttribute('data-tab');
-      document.querySelectorAll('.auth-tab').forEach(t => t.classList.toggle('active', t === tab));
-      const p2w = document.getElementById('auth-pass2-wrap');
-      if (pass2) pass2.style.display = mode === 'register' ? '' : 'none';
-      if (p2w) p2w.style.display = mode === 'register' ? '' : 'none';
-      if (submit) submit.textContent = mode === 'register' ? 'Зарегистрироваться' : 'Войти';
-      const sub = document.getElementById('auth-subtitle');
-      if (sub) sub.textContent = mode === 'register' ? 'создай аккаунт' : 'вход в аккаунт';
-      if (err) err.textContent = '';
+  const form = document.getElementById('auth-form');
+  const guestBtn = document.getElementById('auth-guest');
+
+  function setMode(m) {
+    mode = m === 'register' ? 'register' : 'login';
+    document.querySelectorAll('#auth-screen .auth-tab').forEach(t => {
+      t.classList.toggle('active', t.getAttribute('data-tab') === mode);
     });
+    if (pass2) {
+      if (mode === 'register') {
+        pass2.disabled = false;
+        pass2.removeAttribute('disabled');
+        pass2.setAttribute('minlength', '4');
+      } else {
+        pass2.value = '';
+        pass2.disabled = true;
+        pass2.setAttribute('disabled', 'disabled');
+        pass2.removeAttribute('minlength');
+      }
+    }
+    if (p2w) p2w.style.display = mode === 'register' ? 'block' : 'none';
+    if (submit) submit.textContent = mode === 'register' ? 'Зарегистрироваться' : 'Войти';
+    const sub = document.getElementById('auth-subtitle');
+    if (sub) sub.textContent = mode === 'register' ? 'создай аккаунт' : 'вход в аккаунт';
+    if (err) { err.textContent = ''; err.hidden = true; }
+  }
+
+  // Tabs: capture + bubble for mobile reliability
+  document.querySelectorAll('#auth-screen .auth-tab').forEach(tab => {
+    const handler = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setMode(tab.getAttribute('data-tab'));
+    };
+    tab.addEventListener('click', handler);
+    tab.addEventListener('touchend', handler, { passive: false });
   });
+
   function clearAuthError() {
     if (err) { err.textContent = ''; err.hidden = true; }
   }
+
   async function doAuth(e) {
-    if (e) e.preventDefault();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     clearAuthError();
     const login = (document.getElementById('auth-login')?.value || '').trim();
     const pass = document.getElementById('auth-pass')?.value || '';
-    const p2 = document.getElementById('auth-pass2')?.value || '';
+    const p2 = pass2 ? (pass2.value || '') : '';
+
+    if (login.length < 3) { toast('Логин минимум 3 символа'); return; }
+    if (pass.length < 4) { toast('Пароль минимум 4 символа'); return; }
+    if (mode === 'register' && pass !== p2) { toast('Пароли не совпадают'); return; }
+
+    if (submit) {
+      submit.disabled = true;
+      submit.textContent = mode === 'register' ? 'Регистрация...' : 'Вход...';
+    }
     try {
       let user;
-      if (mode === 'register') {
-        if (pass !== p2) throw new Error('Пароли не совпадают');
-        user = await registerUser(login, pass);
-      } else {
-        user = await loginUser(login, pass);
-      }
+      if (mode === 'register') user = await registerUser(login, pass);
+      else user = await loginUser(login, pass);
       clearAuthError();
-      onLoggedIn(user);
+      await onLoggedIn(user);
     } catch (ex) {
       console.error(ex);
-      clearAuthError();
       toast(ex.message || 'Ошибка входа');
+    } finally {
+      if (submit) {
+        submit.disabled = false;
+        submit.textContent = mode === 'register' ? 'Зарегистрироваться' : 'Войти';
+      }
     }
   }
-  document.getElementById('auth-form')?.addEventListener('submit', doAuth);
-  document.getElementById('auth-submit')?.addEventListener('click', (e) => {
-    // mobile sometimes skips submit
-    const form = document.getElementById('auth-form');
-    if (form && !form.checkValidity()) {
-      form.reportValidity();
-      return;
-    }
-    doAuth(e);
-  });
-  document.getElementById('auth-guest')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    clearAuthError();
-    onLoggedIn(loginAsGuest());
-  });
-  document.getElementById('auth-guest')?.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    clearAuthError();
-    onLoggedIn(loginAsGuest());
-  }, { passive: false });
+
+  if (form) {
+    form.setAttribute('novalidate', 'novalidate');
+    form.addEventListener('submit', doAuth);
+  }
+  if (submit) {
+    submit.addEventListener('click', (e) => { e.preventDefault(); doAuth(e); });
+    submit.addEventListener('touchend', (e) => { e.preventDefault(); doAuth(e); }, { passive: false });
+  }
+
+  if (guestBtn) {
+    const goGuest = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      clearAuthError();
+      Promise.resolve(onLoggedIn(loginAsGuest())).catch(err => {
+        console.error(err);
+        toast(err.message || 'Ошибка');
+      });
+    };
+    guestBtn.addEventListener('click', goGuest);
+    guestBtn.addEventListener('touchend', goGuest, { passive: false });
+  }
+
   document.getElementById('logout-btn')?.addEventListener('click', logout);
+
   document.querySelectorAll('.pass-toggle').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       const id = btn.getAttribute('data-target');
       const input = document.getElementById(id);
       if (!input) return;
@@ -2397,13 +2530,15 @@ function bindAuthUI() {
       if (open && off) {
         open.hidden = show;
         off.hidden = !show;
-      } else {
-        btn.textContent = show ? '👁‍🗨' : '👁';
       }
       btn.setAttribute('title', show ? 'Скрыть пароль' : 'Показать пароль');
     });
   });
+
+  setMode('login');
 }
+
+
 
 // ===================== DUEL LOBBY =====================
 function openDuelLobby() {
@@ -2628,8 +2763,10 @@ function startDuelWithRoom(roomId, room) {
       const myId = currentUser ? fbKey(currentUser.uid) : '';
       const isHost = myId && String(v.host) === myId;
       const myScoreCloud = isHost ? (v.hostScore || 0) : (v.guestScore || 0);
-      duelOppScore = isHost ? (v.guestScore || 0) : (v.hostScore || 0);
+      duelOppScore = isHost ? (Number(v.guestScore) || 0) : (Number(v.hostScore) || 0);
+      window._lastDuelOppScore = duelOppScore;
       const el = document.getElementById('duel-opp');
+      window._lastDuelOppScore = duelOppScore;
       if (el) el.textContent = String(duelOppScore);
       const target = settings.duelTarget || 5000;
 
@@ -2835,9 +2972,9 @@ updateCaseTimer();
 setupThemeOfDay();
 bindSettings();
 updateProfileUI();
-bindAuthUI();
-bindDuelLobbyUI();
-update();
+try { bindAuthUI(); } catch (e) { console.error('bindAuthUI', e); }
+try { bindDuelLobbyUI(); } catch (e) { console.error('bindDuel', e); }
+try { update(); } catch (e) { console.error('update', e); }
 
 try {
   if (typeof firebase !== 'undefined') {
